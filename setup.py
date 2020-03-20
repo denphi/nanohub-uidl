@@ -60,6 +60,7 @@ setup_args = {
     ],
     'include_package_data' : True,
     'install_requires' : [
+        'nanohub-remote>=0.0.1',
     ],
     'extras_require' : {
         'test': [
