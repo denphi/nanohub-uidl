@@ -5,8 +5,9 @@ import numpy as np
 
 class FormHelper():  
   def Number(component, label, description, state, value=0, suffix="",*args, **kwargs):
-    if (state not in component.stateDefinitions):
+    if (isinstance(state, str) and state not in component.stateDefinitions):
       component.addStateVariable(state, {"type":"number", "defaultValue": value})
+    
     number = TeleportElement(TeleportContent(elementType="FormatCustomNumber"))
     variant = kwargs.get("variant", "outlined")
     number.content.attrs["variant"] = variant
@@ -447,7 +448,7 @@ class FormHelper():
         Typography.addContent(TypographyText)        
         group.addContent(Typography)                                
     
-    style = kwargs.get("style", { 'margin': '5px' } )
+    style = kwargs.get("style", { 'margin': '5px', 'width': 'auto' } )
     group.content.style = style    
     for element in elements:
       group.addContent(element)
@@ -619,7 +620,7 @@ class AppBuilder():
         Group.addContent(FormHelper.Tabs(Component, children, "testing"))
     elif "type" in layout and layout["type"] == "group" :
         Group = TeleportElement(MaterialContent(elementType="Paper"))
-        Group.content.style={"border": "1px solid #f1f1f1"}
+        Group.content.style={"border": "1px solid #f1f1f1", "width":"100%"}
         children = []
         if "children" in layout:
             for i, child in enumerate (layout["children"]):
@@ -630,7 +631,7 @@ class AppBuilder():
         Group.addContent(FormHelper.Group(children, direction=direction, label=layout["label"]))
     elif "type" in layout and layout["type"] == "container" :
         Group = TeleportElement(MaterialContent(elementType="Paper"))
-        Group.content.style={"border": "1px solid #f1f1f1"}
+        Group.content.style={"border": "1px solid #f1f1f1", "width":"100%"}
         children = []
         if "children" in layout:
             for i, child in enumerate (layout["children"]):

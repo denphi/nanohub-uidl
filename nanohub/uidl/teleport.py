@@ -435,8 +435,9 @@ class TeleportProject():
     f = open(filename, "w")
     f.write(react)
     f.close()
-    return react
+    return react    
 
+    
   def displayWidget(self, *args, **kwargs):
     filename = "__TMPReactBuld.dat"
     self.buildReact(filename)

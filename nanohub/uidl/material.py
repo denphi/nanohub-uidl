@@ -443,10 +443,10 @@ class MaterialComponents():
                 'style':props.style,
                 'className':value.className,
                 'onValueChange': (v)=> {
-                    value.onChange( {'target':{'value':v.value } } );
+                    value.onChange( {'target':{'value':Number.isInteger(props.decimalscale) ? parseInt(v.value) : parseFloat(v.value)} } );
                 },
                 'onBlur' : (v)=> {
-                    props.onBlur( {'target':{'value':v.target.value } } );
+                    props.onBlur( {'target':{'value':Number.isInteger(props.decimalscale) ? parseInt(v.target.value) : parseFloat(v.target.value) } } );
                 },
                 'value' : Number.isInteger(props.decimalscale) ? parseInt(value.value) : parseFloat(value.value),
                 'isAllowed': (v)=> {
