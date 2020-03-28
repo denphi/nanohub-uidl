@@ -435,6 +435,7 @@ class MaterialBuilder():
 class MaterialComponents():
   def FormatCustomNumber(tp, *args, **kwargs ):
     paper = TeleportElement(MaterialContent(elementType="Paper")) 
+    paper.content.attrs['elevation'] = kwargs.get("elevation", 0)
     paper.content.style = {"width" : "100%"}
     FComponent = TeleportComponent("FormatCustomNumber", paper)
     FComponent.addPropVariable("formatter", {"type":"func", 'defaultValue' : '''(props)=>{
@@ -494,6 +495,7 @@ class MaterialComponents():
   def IconList(tp, *args, **kwargs ):
    
     Paper = TeleportElement(MaterialContent(elementType="Paper")) 
+    Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)    
     Paper.content.style = {"width" : "100%"}        
     IComponent = TeleportComponent("IconListMaterial", Paper)        
     IComponent.addStateVariable("selected", {"type":"string", "defaultValue": {
@@ -726,7 +728,9 @@ class MaterialComponents():
 
     Paper = TeleportElement(MaterialContent(elementType="Paper")) 
     Paper.addContent(ExpansionPanel)    
-    Paper.content.style = {"width" : "100%"}        
+    Paper.content.style = {"width" : "100%"} 
+    Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)
+
     BLMComponent = TeleportComponent("ButtonListMaterial", Paper)        
 
     BLMComponent.addPropVariable("always_open", {"type":"bool", "defaultValue": False})
@@ -751,7 +755,8 @@ class MaterialComponents():
 
   def IntSwitch(tp, *args, **kwargs ):    
     Paper = TeleportElement(MaterialContent(elementType="Paper")) 
-    Paper.content.style = {"width" : "100%"}        
+    Paper.content.style = {"width" : "100%"}  
+    Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)      
     IComponent = TeleportComponent("IntSwitch", Paper)        
 
     FormControl = TeleportElement(MaterialContent(elementType="FormControl"))
@@ -892,6 +897,7 @@ class MaterialComponents():
   def ColorSliders(tp, *args, **kwargs):
    
     Paper = TeleportElement(MaterialContent(elementType="Paper")) 
+    Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)    
     Paper.content.style = {"width" : "100%"}        
     CComponent = TeleportComponent("ColorSliders", Paper)        
     CComponent.addStateVariable("colors", {"type":"array", "defaultValue": {

@@ -1,5 +1,11 @@
+from .teleport import *
+from .material import *
+from .rappture import *
+from .plotly import *
+
 import ipywidgets as widgets
 from traitlets import Unicode, Integer, validate, Bool, Float, TraitError, Dict, List, Any
+import xml, re, json, uuid
 from IPython.display import HTML, Javascript, display
 
 def buildWidget(Project, *args, **kwargs):
@@ -27,35 +33,35 @@ def buildWidget(Project, *args, **kwargs):
         parseState += "        if('"+i+"' in state){" + eol
         if d['type'] == "string":
             parseState += "          state['"+i+"'] = String(state['"+i+"']);" + eol
-            attrs[i] = Unicode(d['defaultValue']).tag(sync=True)
             default[i] =  str(d['defaultValue'])
+            attrs[i] = Unicode(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
         elif d['type'] == "boolean":
             parseState += "          state['"+i+"'] = [true, 'true', 'True', 'on', 'yes', 'Yes', 'TRUE', 1, 'ON'].includes(state['"+i+"']);" + eol
-            attrs[i] = Bool(d['defaultValue']).tag(sync=True)
             default[i] = (d['defaultValue'] in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"])
+            attrs[i] = Bool(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
 
         elif d['type'] == "number":
             parseState += "          state['"+i+"'] = parseFloat(state['"+i+"']);" + eol
-            attrs[i] = Float(d['defaultValue']).tag(sync=True)
             default[i] = float(d['defaultValue'])
+            attrs[i] = Float(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
 
         elif d['type'] == "object":
             parseState += "          state['"+i+"'] = (state['"+i+"']);" + eol
-            attrs[i] = Dict(d['defaultValue']).tag(sync=True)
             default[i] = dict(d['defaultValue'])
+            attrs[i] = Dict(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
 
         elif d['type'] == "array":
             parseState += "          state['"+i+"'] = (state['"+i+"']);" + eol
-            attrs[i] = List().tag(sync=True)
             default[i] = list(d['defaultValue'])
+            attrs[i] = List(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
         parseState += "        }" + eol
@@ -163,8 +169,6 @@ def buildWidget(Project, *args, **kwargs):
 
     def do_init(s, v, f, **k):
         widgets.DOMWidget.__init__(s,**k)
-        for i,j in v.items():
-            setattr(s,i,k.get(i,j))
         for i,j in f.items():
             setattr(s,'_handlers_'+ i, widgets.widget.CallbackDispatcher())
             setattr(s, i , lambda s, c, r=False, m=i : getattr(s,'_handlers_'+ m).register_callback(c, r) )
@@ -174,10 +178,15 @@ def buildWidget(Project, *args, **kwargs):
         s.on_msg(lambda s1,c,b, : s1._handle_uidl_msg(c,b))
         s.__validate = True
         
+        for i,j in v.items():
+            setattr(s,i,k.get(i,j))
+        
     def do__setattr(s,n,v,d):
         if (hasattr(s, '__validate') and n in d):
             if isinstance(d[n], str):
                 widgets.DOMWidget.__setattr__(s,n,str(v))
+            elif type(d[n]) == bool:
+                widgets.DOMWidget.__setattr__(s,n,v in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"])
             elif isinstance(d[n], list):
                 widgets.DOMWidget.__setattr__(s,n,list(v))
             elif isinstance(d[n], dict):
@@ -188,8 +197,6 @@ def buildWidget(Project, *args, **kwargs):
                 widgets.DOMWidget.__setattr__(s,n,int(v))
             elif isinstance(d[n], float):
                 widgets.DOMWidget.__setattr__(s,n,float(v))
-            elif type(d[n]) == bool:
-                widgets.DOMWidget.__setattr__(s,n,v in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"])
             else :
                 widgets.DOMWidget.__setattr__(s,n,v)
         else :
@@ -209,3 +216,84 @@ def buildWidget(Project, *args, **kwargs):
                     
     return type(component + 'Widget', (widgets.DOMWidget,), attrs)
 
+def buildJSX(document, *args, **kwargs):
+    def buildNode(tag, Component):
+        Node = None
+        if tag.nodeType == tag.TEXT_NODE:
+            if tag.data.strip() == '':
+                return None
+            Node = TeleportStatic(content=tag.data.strip().replace("\n", "\\n"))
+        else:
+            if tag.tagName.startswith("Material"):
+                Node = TeleportElement(MaterialContent(elementType=tag.tagName.replace("Material.", "")))
+            elif tag.tagName.startswith("Plotly"):
+                Node = TeleportElement(PlotlyContent(elementType=tag.tagName.replace("Plotly.", "")))
+            else:
+                Node = TeleportElement(TeleportContent(elementType=tag.tagName))
+
+            for t in tag.childNodes:
+                node = buildNode(t, Component)
+                if node is not None:
+                    Node.addContent(node)
+        if (tag.attributes is not None):
+            for k,v in tag.attributes.items():
+                if v.startswith("{") and v.endswith("}") :
+                    regex = "^\{([a-zA-Z][a-zA-Z0-9]+)\:(.+)\((.+)\)\}$"
+                    m = re.match(regex,v)
+                    if m is not None:
+                        state = m.group(1)
+                        if (m.group(2) == "string"):
+                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
+                        elif m.group(2) in ["boolean", "number", "array", "object"] :
+                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3))})
+                        else: 
+                            raise Exception("not a supported type '" + m.group(2) + "'")
+                        Node.content.attrs[k]={
+                          "type": "dynamic",
+                          "content": {
+                            "referenceType": "state",
+                            "id": state
+                          }    
+                        }
+                    else: 
+                        raise Exception("not a supported definition" + v)
+
+                elif v.startswith("[") and v.endswith("]") :
+                    regex = "^\[([a-zA-Z][a-zA-Z0-9]+)\((.+),(.+)\)\]$"
+                    m = re.match(regex,v)
+                    if m is not None:
+                        if m.group(1) in ["stateChange", "propCall2", "propCall"]:
+                            Component.addPropVariable(k, {"type":"func", "defaultValue": "(e)=>{return e; }"})
+                            Node.content.events[k] = [
+                                {
+                                    "type": "propCall2",
+                                    "calls": k,
+                                    "args": ["{'id':'"+m.group(2)+"', 'value':" + m.group(3) + "}"]
+                                },
+                                {
+                                    "type": m.group(1),
+                                    "modifies": m.group(2),
+                                    "calls": m.group(2),
+                                    "newState": '$'+m.group(3),
+                                    "args": [m.group(3)],
+                                }
+                            ]
+                        else: 
+                            raise Exception("not a supported function" + m.group(1))
+                    else: 
+                        raise Exception("not a valid function" + v)
+                elif k=="style": 
+                    Node.content.style = { a[0] : a[1] for a in [t.split(":") for t in v.split(",")] }
+                else:
+                    Node.content.attrs[k]=v
+
+        return Node
+    document = "<uidl>" + document + "</uidl>"
+    dom = xml.dom.minidom.parseString(document)
+    component = kwargs.get("component_name", str(uuid.uuid4()) )
+    component = "UIDL" + component.replace("-","")
+    Project = TeleportProject(component)
+    Project.root.node.addContent(buildNode(dom.childNodes[0], Project.root))
+    if kwargs.get("verbose", False):
+        print(Project.root.buildReact(component))
+    return buildWidget(Project);
