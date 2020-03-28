@@ -222,7 +222,23 @@ def buildJSX(document, *args, **kwargs):
         if tag.nodeType == tag.TEXT_NODE:
             if tag.data.strip() == '':
                 return None
-            Node = TeleportStatic(content=tag.data.strip().replace("\n", "\\n"))
+            if tag.data.strip().startswith("{") and tag.data.strip().endswith("}") :
+                regex = "^\{([a-zA-Z][a-zA-Z0-9_]+)\:(.+)\((.+)\)\}$"
+                m = re.match(regex,tag.data.strip())
+                if m is not None:
+                    state = m.group(1)
+                    if (m.group(2) == "string"):
+                        Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
+                    elif m.group(2) in ["boolean", "number", "array", "object"] :
+                        Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
+                    else: 
+                        raise Exception("not a supported type '" + m.group(2) + "'")
+                    Node = TeleportDynamic(content={"referenceType": "state","id": state})
+
+                else: 
+                    raise Exception("not a supported definition" + tag.data.strip())
+            else:            
+                Node = TeleportStatic(content=tag.data.strip().replace("\n", "\\n"))
         else:
             if tag.tagName.startswith("Material"):
                 Node = TeleportElement(MaterialContent(elementType=tag.tagName.replace("Material.", "")))
@@ -238,14 +254,14 @@ def buildJSX(document, *args, **kwargs):
         if (tag.attributes is not None):
             for k,v in tag.attributes.items():
                 if v.startswith("{") and v.endswith("}") :
-                    regex = "^\{([a-zA-Z][a-zA-Z0-9]+)\:(.+)\((.+)\)\}$"
+                    regex = "^\{([a-zA-Z][a-zA-Z0-9_]+)\:(.+)\((.+)\)\}$"
                     m = re.match(regex,v)
                     if m is not None:
                         state = m.group(1)
                         if (m.group(2) == "string"):
                             Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
                         elif m.group(2) in ["boolean", "number", "array", "object"] :
-                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3))})
+                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
                         else: 
                             raise Exception("not a supported type '" + m.group(2) + "'")
                         Node.content.attrs[k]={
@@ -262,28 +278,39 @@ def buildJSX(document, *args, **kwargs):
                     regex = "^\[([a-zA-Z][a-zA-Z0-9]+)\((.+),(.+)\)\]$"
                     m = re.match(regex,v)
                     if m is not None:
-                        if m.group(1) in ["stateChange", "propCall2", "propCall"]:
+                        if m.group(1) in ["stateChange"]:
                             Component.addPropVariable(k, {"type":"func", "defaultValue": "(e)=>{return e; }"})
+                            Component.addPropVariable("onChange", {"type":"func", "defaultValue": "(e)=>{return e; }"})
+                            v = m.group(3)
+                            if v == "$toogle":
+                                v = "!self.state." + m.group(2)
                             Node.content.events[k] = [
-                                {
-                                    "type": "propCall2",
-                                    "calls": k,
-                                    "args": ["{'id':'"+m.group(2)+"', 'value':" + m.group(3) + "}"]
-                                },
                                 {
                                     "type": m.group(1),
                                     "modifies": m.group(2),
-                                    "calls": m.group(2),
-                                    "newState": '$'+m.group(3),
-                                    "args": [m.group(3)],
+                                    "newState": '$'+v,
+                                },
+                                {
+                                    "type": "propCall2",
+                                    "calls": 'onChange',
+                                    "args": ["{'id':'"+m.group(2)+"', 'value':" + v + "}"]
                                 }
+                            ]
+                        elif m.group(1) in ["propCall", "propCall2"]:
+                            Component.addPropVariable(m.group(2), {"type":"func", "defaultValue": "(e)=>{return e; }"})
+                            Node.content.events[k] = [
+                                {
+                                    "type": "propCall2",
+                                    "calls": m.group(2),
+                                    "args": [m.group(3)]
+                                },
                             ]
                         else: 
                             raise Exception("not a supported function" + m.group(1))
                     else: 
                         raise Exception("not a valid function" + v)
                 elif k=="style": 
-                    Node.content.style = { a[0] : a[1] for a in [t.split(":") for t in v.split(",")] }
+                    Node.content.style = { a[0] : a[1] for a in [t.split(":") for t in v.split(";")] }
                 else:
                     Node.content.attrs[k]=v
 
@@ -293,7 +320,9 @@ def buildJSX(document, *args, **kwargs):
     component = kwargs.get("component_name", str(uuid.uuid4()) )
     component = "UIDL" + component.replace("-","")
     Project = TeleportProject(component)
-    Project.root.node.addContent(buildNode(dom.childNodes[0], Project.root))
+    for node in dom.childNodes[0].childNodes:
+        if node.nodeType != node.TEXT_NODE:
+            Project.root.node.addContent(buildNode(node, Project.root))
     if kwargs.get("verbose", False):
         print(Project.root.buildReact(component))
     return buildWidget(Project);
