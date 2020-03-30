@@ -85,6 +85,8 @@ class TeleportNode():
         react += self.content.buildReact( nativeRef=kwargs.get("nativeRef","") )
     return react
         
+  def getNodeTypes(self):
+    return set()
 
 class TeleportElement(TeleportNode):
   def __init__(self, content, *args, **kwargs):
@@ -94,6 +96,9 @@ class TeleportElement(TeleportNode):
     
   def addContent(self, child):
     self.content.children.append(child)
+    
+  def getNodeTypes(self):
+    return self.content.getNodeTypes()
     
 class TeleportConditional(TeleportNode):
   def __init__(self, content, *args, **kwargs):
@@ -256,6 +261,9 @@ class TeleportComponent():
   def __str__(self):
       return json.dumps(self.__json__())
 
+  def getNodeTypes(self):
+    return self.node.content.getNodeTypes()
+
   def addNode(self, child):
     if (isinstance(child, TeleportNode) ):
       self.node.addContent(child)
@@ -349,7 +357,8 @@ class TeleportProject():
   def __init__(self, name, *args, **kwargs):
       self.project_name = name
       self.globals = TeleportGlobals();
-      self.root = TeleportComponent("MainComponent", TeleportElement(TeleportContent(elementType="container")));
+      content = kwargs.get("content", TeleportElement(TeleportContent(elementType="container")))
+      self.root = TeleportComponent("MainComponent", content);
       self.components = {};
       self.ref = uuid.uuid4()
 
@@ -476,6 +485,16 @@ class TeleportContent():
     self.ref = uuid.uuid4()
     self.name =  kwargs.get("name", None)
     
+    
+  def getNodeTypes(self):
+    types = set()
+    if self.elementType != None:
+        types.add(self.elementType)
+    for c in self.children:
+        for v in c.getNodeTypes(): 
+            types.add(v) 
+    return types
+
   def __json__(self):
     tjson = {}
     if self.name != None:

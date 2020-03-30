@@ -51,6 +51,13 @@ def buildWidget(Project, *args, **kwargs):
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
 
+        elif d['type'] == "integer":
+            parseState += "          state['"+i+"'] = parseInt(state['"+i+"']);" + eol
+            default[i] = int(d['defaultValue'])
+            attrs[i] = Integer(default[i]).tag(sync=True)
+            Project.root.stateDefinitions[i]['type'] = "func"
+            Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
+
         elif d['type'] == "object":
             parseState += "          state['"+i+"'] = (state['"+i+"']);" + eol
             default[i] = dict(d['defaultValue'])
@@ -116,6 +123,7 @@ def buildWidget(Project, *args, **kwargs):
     for k, v in Project.components.items():
       js += v.buildReact(k)
       js += "  " + k + ".getDerivedStateFromProps = function(props, state){" + eol
+      js += "  let self = {'props':props,'state':state};" + eol
       js += "  return {" + eol
       for k1,s1 in v.stateDefinitions.items():
         v1 = s1['defaultValue']
@@ -152,6 +160,7 @@ def buildWidget(Project, *args, **kwargs):
     js += "        orig.apply(this, [state, callback]);" + eol
     js += "      }" + eol
     js += "      const $app = document.createElement('div');" + eol
+    js += "      $app.style.padding = '10px';" + eol
     js += "      const App = React.createElement(" + Project.root.name_component + ");" + eol
     js += "      ReactDOM.render(App, $app);" + eol
     js += "      backbone.el.append($app);" + eol
@@ -210,13 +219,13 @@ def buildWidget(Project, *args, **kwargs):
     attrs['__setattr__'] =  lambda s,n,v, d=default : do__setattr (s,n,v,d) 
 
     
-    display(HTML("<style>.p-Widget * {font-size: unset;box-sizing:border-box}</style>"))
+    display(HTML("<style>.p-Widget * {font-size: unset;}</style>"))
     display(HTML("<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>"))
     display(Javascript(js))
                     
     return type(component + 'Widget', (widgets.DOMWidget,), attrs)
 
-def buildJSX(document, *args, **kwargs):
+def parseJSX(document, *args, **kwargs):
     def buildNode(tag, Component):
         Node = None
         if tag.nodeType == tag.TEXT_NODE:
@@ -229,8 +238,11 @@ def buildJSX(document, *args, **kwargs):
                     state = m.group(1)
                     if (m.group(2) == "string"):
                         Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
-                    elif m.group(2) in ["boolean", "number", "array", "object"] :
-                        Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
+                    elif m.group(2) in ["boolean", "number", "array", "object", "integer"] :
+                        v = m.group(2)
+                        if ( v == "integer"):
+                            v = "number"
+                        Component.addStateVariable(state, {"type":v, "defaultValue": json.loads(m.group(3).replace('\'','"'))})
                     else: 
                         raise Exception("not a supported type '" + m.group(2) + "'")
                     Node = TeleportDynamic(content={"referenceType": "state","id": state})
@@ -240,7 +252,9 @@ def buildJSX(document, *args, **kwargs):
             else:            
                 Node = TeleportStatic(content=tag.data.strip().replace("\n", "\\n"))
         else:
-            if tag.tagName.startswith("Material"):
+            if tag.tagName.startswith("Nanohub"):
+                Node = TeleportElement(TeleportContent(elementType=tag.tagName.replace("Nanohub.", "")))
+            elif tag.tagName.startswith("Material"):
                 Node = TeleportElement(MaterialContent(elementType=tag.tagName.replace("Material.", "")))
             elif tag.tagName.startswith("Plotly"):
                 Node = TeleportElement(PlotlyContent(elementType=tag.tagName.replace("Plotly.", "")))
@@ -260,7 +274,10 @@ def buildJSX(document, *args, **kwargs):
                         state = m.group(1)
                         if (m.group(2) == "string"):
                             Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
-                        elif m.group(2) in ["boolean", "number", "array", "object"] :
+                        elif m.group(2) in ["boolean", "number", "array", "object", "integer"] :
+                            v = m.group(2)
+                            if ( v == "integer"):
+                                v = "number"
                             Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
                         else: 
                             raise Exception("not a supported type '" + m.group(2) + "'")
@@ -318,11 +335,32 @@ def buildJSX(document, *args, **kwargs):
     document = "<uidl>" + document + "</uidl>"
     dom = xml.dom.minidom.parseString(document)
     component = kwargs.get("component_name", str(uuid.uuid4()) )
-    component = "UIDL" + component.replace("-","")
-    Project = TeleportProject(component)
+    component = "UIDL" + component.replace("-","")    
+    Component = TeleportComponent(component, TeleportElement(MaterialContent(elementType="Paper")));
+
     for node in dom.childNodes[0].childNodes:
         if node.nodeType != node.TEXT_NODE:
-            Project.root.node.addContent(buildNode(node, Project.root))
+            Component.node.addContent(buildNode(node, Component))    
+    return Component;    
+    
+def buildJSX(document, *args, **kwargs):
+    component = kwargs.get("component_name", str(uuid.uuid4()) )
+    component = "UIDL" + component.replace("-","")
+    Component = parseJSX(document, *args, **kwargs)
+    Project = TeleportProject(component, content=Component)
+    Project.root.propDefinitions = Component.propDefinitions
+    Project.root.stateDefinitions = Component.stateDefinitions
+    Project.root.node = Component.node
+    for t in Component.getNodeTypes():
+        if t == "FormatCustomNumber":
+            MaterialComponents.FormatCustomNumber(Project)
+        elif t == "IconList":
+            MaterialComponents.IconList(Project)
+        elif t == "IntSwitch":
+            MaterialComponents.IntSwitch(Project)    
+        elif t == "ButtonList":
+            MaterialComponents.ButtonList(Project)  
+    
     if kwargs.get("verbose", False):
         print(Project.root.buildReact(component))
     return buildWidget(Project);

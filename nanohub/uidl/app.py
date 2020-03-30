@@ -645,7 +645,6 @@ class AppBuilder():
             description = layout["description"]        
         if "label" in layout:
             label = layout["label"]  
-        print (label, description, direction)
         Group.addContent(FormHelper.Container(children, direction=direction, label=label, description=description))
     else:
         if layout["id"] in fields:
@@ -830,7 +829,6 @@ class AppBuilder():
                     param.content.attrs["range"] = [v['min'], v['max']]
                     
             elif v["type"] == "String":
-                print (v);
                 param = FormHelper.String( 
                   NComponent,
                   v["label"], 
