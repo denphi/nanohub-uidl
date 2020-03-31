@@ -690,7 +690,7 @@ class MaterialComponents():
         {
           "type": "stateChange",
           "modifies": "open_expansion",
-          "newState": "$self.props.always_open && false"
+          "newState": "$self.props.always_open"
         },
         {
             "type": "propCall2",
@@ -737,8 +737,8 @@ class MaterialComponents():
     BLMComponent.addPropVariable("hide_header", {"type":"bool", "defaultValue": False})
     BLMComponent.addPropVariable("options", {"type":"array", "defaultValue": []})
     BLMComponent.addPropVariable("onChange", {"type":"func", "defaultValue": "(e)=>{}"})
+    BLMComponent.addPropVariable("onDefaultValue", {"type":"func", "defaultValue": "(l,v)=>{let j=l.find((e)=>{return e.key==v}); if (j){ return j;} else { return {key:'', value:''};} }"})
     BLMComponent.addPropVariable("default_value", {"type":"string", "defaultValue": ""})
-    BLMComponent.addPropVariable("onDefaultValue", {"type":"func", "defaultValue": "(l,v)=>{return l.find((e)=>{return e.key==v})}"})
 
     BLMComponent.addStateVariable("open_expansion", {"type":"bool", "defaultValue": True})
     BLMComponent.addStateVariable("class_names", {"type":"object", "defaultValue": {}})

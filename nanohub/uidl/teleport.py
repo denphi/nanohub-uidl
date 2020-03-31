@@ -4,22 +4,53 @@ import jsonschema
 import uuid, weakref, os
 from IPython.display import HTML, Javascript, display
 
+class TeleportCustomCode():
+    def __init__(self, *args, **kwargs):
+        self.ids = {}
+        self.code = []
+        
+    def buildReact(self, *args , **kwargs):
+      return self.__json__()
+      
+    def addCustomCode(self, id, asset):
+      if id in self.ids:
+        pass;
+      else:
+        self.ids[id] = len(self.ids)
+        self.code.append(asset)
+        
+    def __json__(self):
+      js = ""
+      for code in self.code:
+          js += code + "\n";
+      return js
+        
 class TeleportGlobals():
     def __init__(self, *args, **kwargs):
         self.settings = {'language' : 'en', 'title' : ''}
+        self.customCode = {
+            'head' : TeleportCustomCode(), 
+            'body' : TeleportCustomCode()
+        }
         self.assets = []
         self.meta = []
         self.manifest = {}
         self.ids = {}
         
     def __json__(self):
-        return {
+        jsn = {
             "settings" : self.settings,
+            "customCode" : {},
             "assets" : self.assets,
             "meta" : self.meta,
             "manifest" : self.manifest
         }
-    
+        if len (self.customCode['head'].code) > 0: 
+            jsn['customCode']['head'] = self.customCode['head'].__json__()
+        if len (self.customCode['body'].code) > 0 :
+            jsn['customCode']['body'] = self.customCode['body'].__json__()
+        return jsn
+        
     def __str__(self):
         return json.dumps(self.__json__())
         
@@ -40,7 +71,11 @@ class TeleportGlobals():
       else:
         self.ids[id] = len(self.ids)
         self.assets.append(asset)
-      
+        
+    def addCustomCode(self, id, code, position="body"):
+      if position in ["body", "head"]:
+        self.customCode[position].addCustomCode(id, code)
+  
         
 class TeleportNode():
   def __init__(self, *args, **kwargs):
@@ -400,7 +435,10 @@ class TeleportProject():
     react += "<title>" + self.project_name + "</title>\n"
     react += "<script src='https://cdn.plot.ly/plotly-latest.min.js'></script>\n"    
     react += "<script src='https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js'></script>\n"
-    react += "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>\n"
+    react += "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>\n" 
+    react += "<script type='text/javascript'>\n"
+    react += self.globals.customCode['head'].buildReact() + "\n"
+    react += "</script>\n"
     react += "</head>\n"
     react += "  <body style='padding:0;margin:0;height:100%'>\n"
     react += "    <div id='root' style='height:100%'></div>\n"
@@ -427,6 +465,7 @@ class TeleportProject():
     react += "    requirejs(['plotlycomponent', 'plotly', 'math', 'number-format'], function(PlotlyComponent, Plotly, math, Format) {\n"
     react += "      window.React = React\n"
     react += "      const Plot = PlotlyComponent.default(Plotly);\n";
+    react += self.globals.customCode['body'].buildReact()
     react += self.globals.buildReact();
     react += self.root.buildReact(self.root.name_component)
     for k, v in self.components.items():
@@ -813,10 +852,12 @@ class NanohubUtils():
     js += "}" + eol;
 
         
-    tp.globals.addAsset(method_name, {
-      "type": "script",
-      "content": js
-    })    
+    #tp.globals.addAsset(method_name, {
+    #  "type": "script",
+    #  "content": js
+    #}) 
+    tp.globals.addCustomCode(method_name, js)    
+    
 
     js = ""
     js += " LocalForage."+method_name+" = '"+driver_name+"'; " + eol
@@ -827,10 +868,11 @@ class NanohubUtils():
     js += " }).then(function() {" + eol
     js += " });" + eol
     
-    tp.globals.addAsset("_" + method_name, {
-      "type": "script",
-      "content": js
-    })
+    #tp.globals.addAsset("_" + method_name, {
+    #  "type": "script",
+    #  "content": js
+    #})
+    tp.globals.addCustomCode("_" + method_name, js)    
 
     return [
       {
@@ -936,15 +978,18 @@ class NanohubUtils():
     js += "  };" + eol;
     js += "};" + eol;
 
-    tp.globals.addAsset(method_name, {
-      "type": "script",
-      "content": js
-    })    
+    #tp.globals.addAsset(method_name, {
+    #  "type": "script",
+    #  "content": js
+    #})    
+    tp.globals.addCustomCode(method_name, js)    
 
-    tp.globals.addAsset(store_name, {
-      "type": "script",
-      "content": "const " + store_name + " = " + method_name + "(() => " + storage_name + ");" + eol
-    })
+    #tp.globals.addAsset(store_name, {
+    #  "type": "script",
+    #  "content": "const " + store_name + " = " + method_name + "(() => " + storage_name + ");" + eol
+    #})
+    
+    tp.globals.addCustomCode(store_name, "const " + store_name + " = " + method_name + "(() => " + storage_name + ");" + eol)    
 
     return [
       {

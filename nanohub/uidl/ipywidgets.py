@@ -117,6 +117,8 @@ def buildWidget(Project, *args, **kwargs):
     js += "  ) {" + eol
     js += "    const " + component + "View = widgets.DOMWidgetView.extend({" + eol
     js += "      initialize() {" + eol
+    if (kwargs.get("debugger", False)):
+        js += "      debugger;" + eol
     js += "      const backbone = this;" + eol
     js += "      backbone.options = {};" + eol
     
@@ -354,11 +356,11 @@ def buildJSX(document, *args, **kwargs):
     for t in Component.getNodeTypes():
         if t == "FormatCustomNumber":
             MaterialComponents.FormatCustomNumber(Project)
-        elif t == "IconList":
+        elif t == "IconListMaterial":
             MaterialComponents.IconList(Project)
         elif t == "IntSwitch":
             MaterialComponents.IntSwitch(Project)    
-        elif t == "ButtonList":
+        elif t == "ButtonListMaterial":
             MaterialComponents.ButtonList(Project)  
     
     if kwargs.get("verbose", False):
