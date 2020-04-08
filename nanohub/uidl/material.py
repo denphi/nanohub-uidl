@@ -910,16 +910,19 @@ class MaterialComponents():
     eol = "\n"
     updateState = ""
     updateState += "(c,i,a,v)=>{ " + eol
-    updateState += "  c.setState({'colors' : " + eol
-    updateState += "    c.state.colors.map((e, ii)=>{ " + eol
-    updateState += "      if(ii==i) e[a]=v; " + eol
-    updateState += "      return e;" + eol
-    updateState += "    })" + eol
-    updateState += "  });" + eol
+    updateState += "  let new_colors = c.state.colors.map((e, ii)=>{" + eol
+    updateState += "    if(ii==i){" + eol
+    updateState += "      let clone = JSON.parse(JSON.stringify(e));" + eol
+    updateState += "      clone[a]=v;" + eol
+    updateState += "      return clone;" + eol
+    updateState += "    }" + eol
+    updateState += "    return e;" + eol
+    updateState += "  })" + eol
+    updateState += "  c.setState({'colors' : new_colors});" + eol
     updateState += "  if (c.timeout){" + eol
     updateState += "    clearTimeout(c.timeout)" + eol
     updateState += "  }" + eol
-    updateState += "  c.timeout = setTimeout(()=>{ c.props.onChange( {'target':{'value':c.props.colors}} ) }, 20);" + eol
+    updateState += "  c.timeout = setTimeout(()=>{ c.props.onChange( {'target':{'value':new_colors}} ) }, 20);" + eol
     updateState += "}" + eol
     CComponent.addPropVariable("updateState", {
         "type":"func", 
