@@ -24,11 +24,12 @@ def buildWidget(Project, *args, **kwargs):
     
     for i,d in Project.root.propDefinitions.items():  
         if d['type'] == "func":
+            attrs[i] = lambda s, c, r=False, m=i : getattr(s,'_handlers_'+ m).register_callback(c, r)            
             functions[i] =  (d['defaultValue'])
             Project.root.propDefinitions[i]['type'] = "func"
             Project.root.propDefinitions[i]['defaultValue']="(e)=>{ if (event) event.preventDefault(); backbone.send({ event: '" + i + "', 'params' : (" + d['defaultValue'] + ")(e) });}"
     parseState = ""
-
+    serializers = []
     for i,d in Project.root.stateDefinitions.items():  
         parseState += "        if('"+i+"' in state){" + eol
         if d['type'] == "string":
@@ -71,11 +72,17 @@ def buildWidget(Project, *args, **kwargs):
             attrs[i] = List(default[i]).tag(sync=True)
             Project.root.stateDefinitions[i]['type'] = "func"
             Project.root.stateDefinitions[i]['defaultValue']="backbone.model.get('"+i+"')"
+
+        elif d['type'] == "router": #missuse of router to mark widgets arrays
+            parseState += "          state['"+i+"'] = (state['"+i+"']);" + eol
+            default[i] = list()
+            attrs[i] = widgets.trait_types.TypedTuple(trait=Instance(widgets.Widget)).tag(sync=True, **widgets.widget_serialization)
+            Project.root.stateDefinitions[i]['type'] = "array"
+            Project.root.stateDefinitions[i]['defaultValue']=[]
+            serializers.append(i)
         parseState += "        }" + eol
 
-        default['children'] = list()
-        attrs['children'] = widgets.trait_types.TypedTuple(trait=Instance(widgets.Widget), help="List of widget children").tag(
-        sync=True, **widgets.widget_serialization)
+
     
     js = ""
     js += "require.config({" + eol
@@ -124,7 +131,8 @@ def buildWidget(Project, *args, **kwargs):
 
     js += "    const " + component + "Model = widgets.WidgetModel.extend({}, {" + eol
     js += "        serializers: _.extend({" + eol
-    js += "            children: { deserialize: widgets.unpack_models }" + eol
+    for i in serializers:
+        js += "            " + i + ": { deserialize: widgets.unpack_models }," + eol
     js += "        }, widgets.DOMWidgetModel.serializers)" + eol
     js += "    });" + eol
     
@@ -136,10 +144,11 @@ def buildWidget(Project, *args, **kwargs):
 
     js += "        const backbone = this;" + eol
     js += "        widgets.DOMWidgetView.prototype.initialize.call(this, arguments);" + eol
-    js += "        backbone.children_views = new widgets.ViewList(backbone.add_child_model, null, backbone);" + eol
-    js += "        backbone._children = [];" + eol
+    for i in serializers:
+        js += "        backbone."+i+"_views = new widgets.ViewList(backbone.add_child_model, null, backbone);" + eol
+        js += "        backbone._"+i+" = [];" + eol
+        js += "        backbone."+i+"Ref = React.createRef();" + eol
     js += "        backbone.options = {};" + eol
-    js += "        backbone.childrenRef = React.createRef();" + eol
     
     for k, v in Project.components.items():
       js += v.buildReact(k)
@@ -170,28 +179,26 @@ def buildWidget(Project, *args, **kwargs):
     js += "          orig.apply(this, [Object.assign({},model.changed)]);" + eol
     js += "        }" + eol
     js += "        " + Project.root.name_component + ".prototype.componentDidUpdate = function(){" + eol
-    js += "          if(backbone.childrenRef.current){" + eol
-    js += "            backbone._children.forEach((e)=>{" + eol
-    js += "              backbone.childrenRef.current.appendChild(e);" + eol
-    js += "            });" + eol
-    js += "          }" + eol
+    for i in serializers:
+        js += "          if(backbone."+i+"Ref.current){" + eol
+        js += "            backbone._"+i+".forEach((e)=>{" + eol
+        js += "              backbone."+i+"Ref.current.appendChild(e);" + eol
+        js += "            });" + eol
+        js += "          }" + eol
     js += "        }" + eol
     js += "        " + Project.root.name_component + ".getDerivedStateFromProps = function(props, state){" + eol
-    #js += "          state['_children'] = {__html: backbone._children.join('')};" + eol
     js += "          return state;" + eol
     js += "        }" + eol
     js += "        " + Project.root.name_component + ".prototype.componentDidMount = function(){" + eol
     js += "          backbone.listenTo(backbone.model, 'change', this.onChange.bind(this));" + eol
-    js += "          backbone.listenTo(backbone.model, 'change:children', this.updateChild.bind(this));" + eol
-    js += "          if(backbone.childrenRef.current){" + eol
-    js += "            this.updateChild(null, backbone.model.get('children'));" + eol
-    js += "            console.log(backbone.childrenRef);" + eol
-    js += "            backbone._children.forEach((e)=>{" + eol
-    js += "              console.log(e);" + eol
-    js += "              backbone.childrenRef.current.appendChild(e);" + eol
-    js += "              console.log(backbone.childrenRef.current);" + eol
-    js += "            });" + eol
-    js += "          }" + eol    
+    for i in serializers:
+        js += "          backbone.listenTo(backbone.model, 'change:"+i+"', this.update"+i+".bind(this));" + eol
+        js += "          if(backbone."+i+"Ref.current){" + eol
+        js += "            this.update"+i+"(null, backbone.model.get('"+i+"'));" + eol
+        js += "            backbone._"+i+".forEach((e)=>{" + eol
+        js += "              backbone."+i+"Ref.current.appendChild(e);" + eol
+        js += "            });" + eol
+        js += "          }" + eol    
     js += "        }" + eol
     js += "        " + Project.root.name_component + ".prototype.setState = function(state, callback){" + eol
     js += parseState;
@@ -201,17 +208,18 @@ def buildWidget(Project, *args, **kwargs):
     js += "          backbone.model.save_changes();" + eol
     js += "          orig.apply(this, [state, callback]);" + eol
     js += "        }" + eol
-    js += "        " + Project.root.name_component + ".prototype.updateChild = function(m, v){" + eol
-    js += "          if (backbone.children_views){" + eol
-    js += "            backbone._children = [];" + eol
-    js += "            backbone.children_views.update(v).then((views)=>{" + eol
-    js += "              views.forEach(view => {" + eol
-    js += "                backbone._children.push(view.el);" + eol     
-    js += "              });" + eol     
-    js += "              this.forceUpdate()" + eol     
-    js += "            });" + eol     
-    js += "          }" + eol     
-    js += "        }" + eol       
+    for i in serializers:   
+        js += "        " + Project.root.name_component + ".prototype.update"+i+" = function(m, v){" + eol
+        js += "          if (backbone."+i+"_views){" + eol
+        js += "            backbone._"+i+" = [];" + eol
+        js += "            backbone."+i+"_views.update(v).then((views)=>{" + eol
+        js += "              views.forEach(view => {" + eol
+        js += "                backbone._"+i+".push(view.el);" + eol     
+        js += "              });" + eol     
+        js += "              this.forceUpdate()" + eol     
+        js += "            });" + eol     
+        js += "          }" + eol     
+        js += "        }" + eol       
     js += "        backbone.app = document.createElement('div');" + eol
     js += "        backbone.app.style.padding = '10px';" + eol
     js += "        const App = React.createElement(" + Project.root.name_component + ");" + eol
@@ -221,11 +229,17 @@ def buildWidget(Project, *args, **kwargs):
     
     
     js += "      add_child_model: function(model) {" + eol
-    js += "        return this.create_child_view(model)" + eol
+    js += "        return this.create_child_view(model).then((view) => {" + eol
+    js += "          view.setLayout(view.model.get('layout'));" + eol
+    js += "          let lview=view;" + eol
+    js += "          lview.listenTo(lview.model,'change:layout',(m, v) => {" + eol
+    js += "            this.update_children()" + eol
+    js += "          });" + eol
+    js += "          return view;" + eol
+    js += "        });" + eol
     js += "      }, " + eol
         
     js += "      update_children: function () {" + eol
-    js += "          console.log(this.model.get('children'));" + eol
     js += "          this.children_views.update(this.model.get('children')).then(function (views) {" + eol
     js += "              views.forEach(function (view) {" + eol
     js += "                  messaging_1.MessageLoop.postMessage(view.pWidget, widgets_1.Widget.ResizeMessage.UnknownSize);" + eol
@@ -242,16 +256,22 @@ def buildWidget(Project, *args, **kwargs):
     js += "      " + component + "Model" + eol
     js += "    };" + eol
     js += "});" + eol
+    #out = widgets.Output()
+    #display(out)
+    #with out:
+    #    print("DEBUG")
     def do_handle_msg(s, d, f, c, b):
-            for i,j in f.items():        
-                if c.get('event', '') == i:
-                    getattr(s,i + "_call")(s, obj=s, buf=c.get('params', ''))
+        for i,j in f.items():        
+            if c.get('event', '') == i:
+                getattr(s,i + "_call")(s, obj=s, buf=c.get('params', ''))
+                return;
+        #widgets.Widget._handle_msg(s,c,b)
 
     def do_init(s, v, f, **k):
         widgets.DOMWidget.__init__(s,**k)
         for i,j in f.items():
             setattr(s,'_handlers_'+ i, widgets.widget.CallbackDispatcher())
-            setattr(s, i , lambda s, c, r=False, m=i : getattr(s,'_handlers_'+ m).register_callback(c, r) )
+            setattr(s, i , lambda c, r=False, m=i : getattr(s,'_handlers_'+ m).register_callback(c, r) )
             setattr(s, i + "_call" , lambda s, m=i, obj=s, buf=[] : getattr(s,'_handlers_'+ m)(obj=obj, buf=buf) )
             if (k.get(i,None) is not None and hasattr(k.get(i,None), '__call__')):
                 getattr(s,i)(s, k.get(i,None))
@@ -262,23 +282,27 @@ def buildWidget(Project, *args, **kwargs):
             setattr(s,i,k.get(i,j))
         
     def do__setattr(s,n,v,d):
-        if (hasattr(s, '__validate') and n in d):
-            if isinstance(d[n], str):
-                widgets.DOMWidget.__setattr__(s,n,str(v))
-            elif type(d[n]) == bool:
-                widgets.DOMWidget.__setattr__(s,n,v in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"])
-            elif isinstance(d[n], list):
-                widgets.DOMWidget.__setattr__(s,n,list(v))
-            elif isinstance(d[n], dict):
-                vc = dict(getattr(s,n))
-                vc.update(v)
-                widgets.DOMWidget.__setattr__(s,n,vc)
-            elif isinstance(d[n], int):
-                widgets.DOMWidget.__setattr__(s,n,int(v))
-            elif isinstance(d[n], float):
-                widgets.DOMWidget.__setattr__(s,n,float(v))
-            else :
+        if (hasattr(s, '__validate')):
+            if (n in d):
+                if isinstance(d[n], str):
+                    widgets.DOMWidget.__setattr__(s,n,str(v))
+                elif type(d[n]) == bool:
+                    widgets.DOMWidget.__setattr__(s,n,v in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"])
+                elif isinstance(d[n], list):
+                    widgets.DOMWidget.__setattr__(s,n,list(v))
+                elif isinstance(d[n], dict):
+                    vc = dict(getattr(s,n))
+                    vc.update(v)
+                    widgets.DOMWidget.__setattr__(s,n,vc)
+                elif isinstance(d[n], int):
+                    widgets.DOMWidget.__setattr__(s,n,int(v))
+                elif isinstance(d[n], float):
+                    widgets.DOMWidget.__setattr__(s,n,float(v))
+                else :
+                    widgets.DOMWidget.__setattr__(s,n,v)
+            else:
                 widgets.DOMWidget.__setattr__(s,n,v)
+
         else :
             widgets.DOMWidget.__setattr__(s,n,v)
     attrs['_model_name'] = Unicode(component + 'Model').tag(sync=True)
@@ -291,8 +315,9 @@ def buildWidget(Project, *args, **kwargs):
     attrs['__setattr__'] =  lambda s,n,v, d=default : do__setattr (s,n,v,d) 
 
     
+    default_styles = "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>"
     display(HTML("<style>.p-Widget * {font-size: unset;}</style>"))
-    display(HTML("<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>"))
+    display(HTML(kwargs.get("styles", default_styles)))
     if kwargs.get("verbose", False):
         print(js)
     display(Javascript(js))
@@ -346,15 +371,29 @@ def parseJSX(document, *args, **kwargs):
                     m = re.match(regex,v)
                     if m is not None:
                         state = m.group(1)
-                        if (m.group(2) == "string"):
-                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
-                        elif m.group(2) in ["boolean", "number", "array", "object", "integer"] :
-                            v = m.group(2)
-                            if ( v == "integer"):
-                                v = "number"
-                            Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
-                        else: 
-                            raise Exception("not a supported type '" + m.group(2) + "'")
+                        if k=="_children": 
+                            if (m.group(2) == "array"):
+                                Component.addStateVariable(state, {"type":"router", "defaultValue": []})
+                                Node.content.attrs['ref']={
+                                  "type": "dynamic",
+                                  "content": {
+                                    "referenceType": "local",
+                                    "id": 'backbone.' + state + 'Ref'
+                                  }    
+                                }  
+                                Node.content.attrs[k]=''
+                            else:
+                                raise Exception("_children only support array type'" + m.group(2) + "'")
+                        else :
+                            if (m.group(2) == "string"):
+                                Component.addStateVariable(state, {"type":m.group(2), "defaultValue": m.group(3)})
+                            elif m.group(2) in ["boolean", "number", "array", "object", "integer"] :
+                                v = m.group(2)
+                                if ( v == "integer"):
+                                    v = "number"
+                                Component.addStateVariable(state, {"type":m.group(2), "defaultValue": json.loads(m.group(3).replace('\'','"'))})
+                            else: 
+                                raise Exception("not a supported type '" + m.group(2) + "'")
                         Node.content.attrs[k]={
                           "type": "dynamic",
                           "content": {
@@ -402,23 +441,6 @@ def parseJSX(document, *args, **kwargs):
                         raise Exception("not a valid function" + v)
                 elif k=="style": 
                     Node.content.style = { a[0] : a[1] for a in [t.split(":") for t in v.split(";")] }
-                elif k=="append_children": 
-                    #Component.addStateVariable("_children", {"type":"object", "defaultValue": {'__html':''}})
-                    #Node.content.attrs['dangerouslySetInnerHTML']={
-                    #  "type": "dynamic",
-                    #  "content": {
-                    #    "referenceType": "state",
-                    #    "id": '_children'
-                    #  }    
-                    #}
-                    #Component.addStateVariable("_children", {"type":"func", "defaultValue": '(n)=>{console.log(backbone);backbone._children.forEach((a)=>{n.append(a);});}'})
-                    Node.content.attrs['ref']={
-                      "type": "dynamic",
-                      "content": {
-                        "referenceType": "local",
-                        "id": 'backbone.childrenRef'
-                      }    
-                    }
                 else:
                     Node.content.attrs[k]=v
 
