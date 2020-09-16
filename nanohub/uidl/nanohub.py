@@ -13,7 +13,19 @@ class Auth():
     AComponent.addStateVariable("typepassword", {"type":"string", 'defaultValue' : "password"})  
     AComponent.addStateVariable("loading", {"type":"boolean", 'defaultValue' : False})  
     AComponent.addStateVariable("message", {"type":"string", 'defaultValue' : ""})  
-    
+    AComponent.addPropVariable("onLoad", {"type":"func", 'defaultValue' : '''(self)=>{
+      self.props.refreshToken(self);
+    }'''})
+
+    #Auth.refreshToken(
+    #    tp,
+    #    AComponent,
+    #    client_id=kwargs.get("client_id",""),
+    #    client_secret=kwargs.get("client_secret",""),
+    #    url=kwargs.get("url","")
+    #)
+
+
     AComponent.addPropVariable("username_icon", {"type":"func", 'defaultValue' : '''()=>{
         return { 
             'startAdornment' : React.createElement(
@@ -413,7 +425,7 @@ class Auth():
     eol = "\n"
     js = ""
     js = "(self)=>{" + eol    
-    js += "  var token = " + store_name + ".getItem('nanohub_token');" + eol
+    js += "  var token = " + store_name + ".getItem('nanohub_refresh_token');" + eol
     js += "  var data = '';" + eol
     js += "  data = 'client_id="+client_id+"&';" + eol
     js += "  data += 'client_secret="+client_secret+"&';" + eol
@@ -423,42 +435,44 @@ class Auth():
     js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol
     js += "  var url = '" + url + "';" + eol
     js += "  let selfr = self;" + eol
-    js += "  Axios.request(url, options)" + eol
-    js += "  .then(function(response){" + eol
-    js += "    var data = response.data;" + eol
-    js += "    if(data.code){" + eol    
-    js += "      " + store_name + ".removeItem('nanohub_token');" + eol
-    js += "      " + store_name + ".removeItem('nanohub_expires');" + eol
-    js += "      " + store_name + ".removeItem('nanohub_refresh_token');" + eol
-    js += "      if(data.message){" + eol    
-    js += "        selfr.props.onError(data.message);" + eol
-    js += "        selfr.setState({'open' : true, 'loading' : false, 'message' : data.message});" + eol
-    js += "      } else {" + eol    
-    js += "        selfr.props.onError('Error authenticating user');" + eol
-    js += "        selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol    
-    js += "      } " + eol    
-    js += "    } else {" + eol
-    js += "      if(data.access_token){" + eol    
-    js += "        " + store_name + ".setItem('nanohub_token', String(data.access_token));" + eol
-    js += "        " + store_name + ".setItem('nanohub_expires', JSON.stringify(Date.now()+parseInt(data.expires_in)-200));" + eol
-    js += "        " + store_name + ".setItem('nanohub_refresh_token', String(data.refresh_token));" + eol
-    js += "        selfr.setState({'open' : false, 'loading' : false, 'message' : ''});" + eol
-    js += "        selfr.props.onAuth( selfr );" + eol
-    js += "      } else {" + eol
+    js += "  if (token){" + eol
+    js += "    Axios.request(url, options)" + eol
+    js += "    .then(function(response){" + eol
+    js += "      var data = response.data;" + eol
+    js += "      if(data.code){" + eol    
     js += "        " + store_name + ".removeItem('nanohub_token');" + eol
     js += "        " + store_name + ".removeItem('nanohub_expires');" + eol
     js += "        " + store_name + ".removeItem('nanohub_refresh_token');" + eol
-    js += "        selfr.props.onError('Error authenticating user');" + eol
-    js += "        selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol    
+    js += "        if(data.message){" + eol    
+    js += "          selfr.props.onError(data.message);" + eol
+    js += "          selfr.setState({'open' : true, 'loading' : false, 'message' : data.message});" + eol
+    js += "        } else {" + eol    
+    js += "          selfr.props.onError('Error authenticating user');" + eol
+    js += "          selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol    
+    js += "        } " + eol    
+    js += "      } else {" + eol
+    js += "        if(data.access_token){" + eol    
+    js += "          " + store_name + ".setItem('nanohub_token', String(data.access_token));" + eol
+    js += "          " + store_name + ".setItem('nanohub_expires', JSON.stringify(Date.now()+parseInt(data.expires_in)-200));" + eol
+    js += "          " + store_name + ".setItem('nanohub_refresh_token', String(data.refresh_token));" + eol
+    js += "          selfr.setState({'open' : false, 'loading' : false, 'message' : ''});" + eol
+    js += "          selfr.props.onAuth( selfr );" + eol
+    js += "        } else {" + eol
+    js += "          " + store_name + ".removeItem('nanohub_token');" + eol
+    js += "          " + store_name + ".removeItem('nanohub_expires');" + eol
+    js += "          " + store_name + ".removeItem('nanohub_refresh_token');" + eol
+    js += "          selfr.props.onError('Error authenticating user');" + eol
+    js += "          selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol    
+    js += "        }" + eol
     js += "      }" + eol
-    js += "    }" + eol
-    js += "  }).catch(function(error){"
-    js += "    " + store_name + ".removeItem('nanohub_token');" + eol
-    js += "    " + store_name + ".removeItem('nanohub_expires');" + eol
-    js += "    " + store_name + ".removeItem('nanohub_refresh_token');" + eol
-    js += "    selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol
-    js += "    selfr.props.onError('Error authenticating user');" + eol
-    js += "  })" + eol
+    js += "    }).catch(function(error){"
+    js += "      " + store_name + ".removeItem('nanohub_token');" + eol
+    js += "      " + store_name + ".removeItem('nanohub_expires');" + eol
+    js += "      " + store_name + ".removeItem('nanohub_refresh_token');" + eol
+    js += "      selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol
+    js += "      selfr.props.onError('Error authenticating user');" + eol
+    js += "    })" + eol
+    js += "  }" + eol    
     js += "}" + eol
     Component.addPropVariable("refreshToken", {"type":"func", 'defaultValue' :js})   
                        

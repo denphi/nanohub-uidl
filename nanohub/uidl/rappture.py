@@ -280,13 +280,13 @@ class RapptureBuilder():
     js += "      } " + eol    
     js += "    }else{" + eol    
     js += "      if(data.session){" + eol    
-    js += "        setTimeout(function(){ self.props.onCheckSession(self, data.session, true) }, 4000);" + eol
+    js += "        setTimeout(function(){ self.props.onCheckSession(self, data.session, 5) }, 4000);" + eol
     js += "      } else {" + eol    
     js += "        self.props.onError( 'Error submiting the simulation, session not found' );" + eol
     js += "      }" + eol    
     js += "    }" + eol    
     js += "  }).catch(function(error){" + eol
-    js += "    self.props.onError(error);" + eol      
+    js += "    self.props.onError(String(error));" + eol      
     js += "  })"
     if (use_cache):    
       js += "  } else { " + eol
@@ -327,25 +327,32 @@ class RapptureBuilder():
     js += "            self.props.onLoad(self);" + eol      
     js += "            self.props.onLoadResults(self, session_id, status['run_file']);" + eol
     js += "          } else {" + eol
-    js += "            if (reload){" + eol
-    js += "              setTimeout(function(){self.props.onCheckSession(self, session_id, false)},2000);" + eol
+    js += "            if (reload > 0){" + eol
+    js += "              setTimeout(function(){self.props.onCheckSession(self, session_id, 0)},2000);" + eol
     js += "            }" + eol
     js += "          }" + eol
     js += "        } else {" + eol
-    js += "          if (reload){" + eol
+    js += "          if (reload > 0){" + eol
     js += "            setTimeout(function(){self.props.onCheckSession(self, session_id, reload)},2000);" + eol
     js += "          }" + eol
     js += "        }" + eol
     js += "      }"
     js += "    } else if (status['code']){" + eol
-    js += "      if (status['code'] != 200){" + eol
-    js += "        self.props.onError(status['message']);" + eol          
+    js += "      if (status['code'] == 404){" + eol
+    js += "        setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},4000);" + eol          
+    js += "      }"
+    js += "      else if (status['code'] != 200){" + eol
+    js += "        self.props.onError(status['message']);" + eol
     js += "      }"
     js += "    }"
     js += "  }).catch(function(error){" + eol
-    js += "    self.props.onError(error);" + eol      
-    js += "  })"
-    js += "}"
+    js += "    if (reload > 0 && String(error).includes('404')){" + eol    
+    js += "      setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},4000);" + eol
+    js += "    } else {" + eol
+    js += "      self.props.onError(String(error));" + eol
+    js += "    }" + eol
+    js += "  })" + eol
+    js += "}" + eol
 
     Component.addPropVariable("onCheckSession", {"type":"func", 'defaultValue' :js})    
 

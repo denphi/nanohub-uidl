@@ -158,20 +158,20 @@ class MaterialBuilder():
     >>> ExpansionPanel(state="DrawerIsVisible", position="static", "variant":"dense" )
 
     """  
-    ExpansionPanel = TeleportElement(MaterialContent(elementType="ExpansionPanel"))
+    ExpansionPanel = TeleportElement(MaterialContent(elementType="Accordion"))
     if kwargs.get("disabled", False) is True:
         ExpansionPanel.content.attrs["disabled"] = True
     if kwargs.get("expanded", None) is not None:
         ExpansionPanel.content.attrs["expanded"] = kwargs.get("expanded", False)
     if kwargs.get("defaultExpanded", None) is not None:
         ExpansionPanel.content.attrs["defaultExpanded"] = kwargs.get("defaultExpanded", True)
-    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="ExpansionPanelSummary"))
+    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="AccordionSummary"))
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")
     ExpansionPanelSummary.content.attrs["id"] = kwargs.get("id", kwargs.get("title", ""))
     ExpansionPanelSummary.content.style = {'backgroundColor' : '#dbeaf0' }
 
-    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="ExpansionPanelDetails"))
+    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="AccordionDetails"))
     ExpansionPanelDetails.content.style = {"padding" : "0px"}
     if kwargs.get("content", None) is not None:
         for content in kwargs.get("content", []):
@@ -391,6 +391,9 @@ class MaterialBuilder():
           'colorSecondary':{
               'color' : secondary_button,
               'background-color' : secondary_button_bg,
+          },
+          'label' : {
+              'font-family': 'Material Icons',
           }
         },
         'MuiOutlinedInput' : {
@@ -513,7 +516,7 @@ class MaterialComponents():
     IComponent.addPropVariable("onDefaultValue", {"type":"func", "defaultValue": "(l,v)=>{return l.find((e)=>{return e.key==v})}"})
     
     bvalues = { True : "primary",  False : "secondary"}    
-    ExpansionPanel = TeleportElement(MaterialContent(elementType="ExpansionPanel"))
+    ExpansionPanel = TeleportElement(MaterialContent(elementType="Accordion"))
     ExpansionPanel.content.attrs["expanded"] = {
       "type": "dynamic",
       "content": {
@@ -522,7 +525,7 @@ class MaterialComponents():
       }    
     }
     ExpansionPanel.content.attrs["defaultExpanded"] = True
-    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="ExpansionPanelSummary"))
+    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="AccordionSummary"))
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")
 
@@ -560,7 +563,7 @@ class MaterialComponents():
     Typography.addContent(TeleportStatic(content="  "))
     ExpansionPanelSummary.addContent(Typography)        
                                            
-    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="ExpansionPanelDetails"))
+    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="AccordionDetails"))
 
     Grid = TeleportElement(MaterialContent(elementType="Grid"))
     Grid.content.attrs["container"] = True
@@ -637,7 +640,7 @@ class MaterialComponents():
   def ButtonList(tp, *args, **kwargs ):
    
     bvalues = { True : "primary",  False : "secondary"}    
-    ExpansionPanel = TeleportElement(MaterialContent(elementType="ExpansionPanel"))
+    ExpansionPanel = TeleportElement(MaterialContent(elementType="Accordion"))
     ExpansionPanel.content.attrs["expanded"] = {
       "type": "dynamic",
       "content": {
@@ -646,7 +649,7 @@ class MaterialComponents():
       }    
     }
     ExpansionPanel.content.attrs["defaultExpanded"] = True
-    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="ExpansionPanelSummary"))
+    ExpansionPanelSummary = TeleportElement(MaterialContent(elementType="AccordionSummary"))
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")                                         
 
@@ -657,7 +660,7 @@ class MaterialComponents():
     Typography.addContent(TeleportStatic(content="  "))
     ExpansionPanelSummary.addContent(Typography)        
                                            
-    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="ExpansionPanelDetails"))
+    ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="AccordionDetails"))
 
     Grid = TeleportElement(MaterialContent(elementType="Grid"))
     Grid.content.attrs["container"] = True
