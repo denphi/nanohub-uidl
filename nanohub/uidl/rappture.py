@@ -280,7 +280,7 @@ class RapptureBuilder():
     js += "      } " + eol    
     js += "    }else{" + eol    
     js += "      if(data.session){" + eol    
-    js += "        setTimeout(function(){ self.props.onCheckSession(self, data.session, 5) }, 4000);" + eol
+    js += "        setTimeout(function(){ self.props.onCheckSession(self, data.session, 10) }, 4000);" + eol
     js += "      } else {" + eol    
     js += "        self.props.onError( 'Error submiting the simulation, session not found' );" + eol
     js += "      }" + eol    
@@ -339,7 +339,7 @@ class RapptureBuilder():
     js += "      }"
     js += "    } else if (status['code']){" + eol
     js += "      if (status['code'] == 404){" + eol
-    js += "        setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},4000);" + eol          
+    js += "        setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},8000);" + eol          
     js += "      }"
     js += "      else if (status['code'] != 200){" + eol
     js += "        self.props.onError(status['message']);" + eol
@@ -347,7 +347,7 @@ class RapptureBuilder():
     js += "    }"
     js += "  }).catch(function(error){" + eol
     js += "    if (reload > 0 && String(error).includes('404')){" + eol    
-    js += "      setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},4000);" + eol
+    js += "      setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},8000);" + eol
     js += "    } else {" + eol
     js += "      self.props.onError(String(error));" + eol
     js += "    }" + eol
@@ -2168,7 +2168,7 @@ class RapptureBuilder():
     js += "        component.props.onLoadBoundary(component,[min_p, max_p])" + eol
     js += "      }" + eol   
     
-    js += "      var colorscalea = [[0,'rgba(200,0,0,0.01)']];" + eol
+    js += "      var colorscalea = [[0,'rgba(200,0,0,1.0)']];" + eol
     js += "      var cv = [];" + eol
     js += "      var xts = [];" + eol
     js += "      var yts = [];" + eol
@@ -2194,7 +2194,8 @@ class RapptureBuilder():
     js += "        'hovertext' : texts," + eol    
     js += "        'showscale' : false," + eol    
     js += "        'hoverinfo' : 'text'," + eol    
-    js += "        'colorscale' : colorscalea," + eol    
+    js += "        'colorscale' : colorscalea," + eol  
+    js += "        'opacity' : 1.0," + eol
     js += "        'surfacecolor' : cv," + eol    
     js += "        'connectgaps' : false," + eol    
     js += "        'lighting' : { " + eol    
@@ -2275,7 +2276,7 @@ class RapptureBuilder():
     js += "          opacity = 0.2;" + eol
     js += "        }" + eol
     js += "        var cv = xt[c].map((x)=>{ return x.map((p) => {return 1;});});" + eol
-    js += "        var colorscalea = [[0,'rgba(200,0,0,0.01)'], [1,component.props.getColor(component, c)]];" + eol
+    js += "        var colorscalea = [[0,'rgba(200,0,0,1.0)'], [1,component.props.getColor(component, c)]];" + eol
     js += "        traces.push({" + eol
     js += "          'type' : 'surface'," + eol
     js += "          'x' : xt[c]," + eol
