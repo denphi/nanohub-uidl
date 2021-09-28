@@ -7,6 +7,11 @@ class MaterialContent(TeleportContent):
     return "Material." + elementType
 
 
+class MaterialLabContent(TeleportContent):
+
+  def buildElementType(self):   
+    elementType = self.elementType
+    return "MaterialLab." + elementType
 
 class MaterialBuilder():
   def AppBar(*args, **kwargs):
@@ -36,7 +41,7 @@ class MaterialBuilder():
     Typography.addContent(TypographyText)
 
     if kwargs.get("state", None) is not None:
-      states = {0:"unfold_more", 1:"unfold_less"}
+      states = {0:"arrow_forward_ios", 1:"arrow_back_ios"}
       for k,v in states.items():
         IconButton = TeleportElement(MaterialContent(elementType="IconButton"))
         IconButton.content.attrs["edge"] = "start"
@@ -54,7 +59,8 @@ class MaterialBuilder():
           IconButton.content.events["click"].append({
             "type": "stateChange",
             "modifies": styles[0],
-            "newState": styles[1][k]
+            "newState": styles[1][k],
+            "callbacks": kwargs.get("callbacks", [])
           })
         
         Icon = TeleportElement(MaterialContent(elementType="Icon"))
@@ -80,7 +86,7 @@ class MaterialBuilder():
       if kwargs.get("onClickMenu", None) is not None:
         IconButton.content.events["click"] = kwargs.get("onClickMenu", [])
       Icon = TeleportElement(MaterialContent(elementType="Icon"))
-      IconText = TeleportStatic(content="unfold_more")
+      IconText = TeleportStatic(content="arrow_forward_ios")
       Icon.addContent(IconText)   
       IconButton.addContent(Icon)
       ToolBar.addContent(IconButton)
@@ -169,7 +175,7 @@ class MaterialBuilder():
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")
     ExpansionPanelSummary.content.attrs["id"] = kwargs.get("id", kwargs.get("title", ""))
-    ExpansionPanelSummary.content.style = {'backgroundColor' : '#dbeaf0' }
+    ExpansionPanelSummary.content.style = {'backgroundColor' : '#dbeaf0', 'display' : 'flex', 'padding' : '20px' }
 
     ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="AccordionDetails"))
     ExpansionPanelDetails.content.style = {"padding" : "0px"}
@@ -270,7 +276,7 @@ class MaterialBuilder():
           'root': { 'color': 'rgba(0, 0, 0, 0.54)' },
         },
         'MuiGrid' : {
-          'item' : { 'display' : 'flex', 'flex-direction' : 'column', 'padding': '4px' }
+          'item' : { 'display' : 'flex', 'flexDirection' : 'column', 'padding': '4px' }
         },
         'MuiDrawer' : {
           'paper' : {
@@ -288,6 +294,13 @@ class MaterialBuilder():
             'backgroundColor':secondary_bg
           },
         },
+        #'MuiButtonBase' : {
+        #    'root' : {
+        #        'text-transform' : 'none',
+        #        'padding' : '6px 16px',
+        #        'border-radius' : '4px',
+        #    },
+        #},
         'MuiButton' : {
             'root' : {
                 'text-transform' : 'none',
@@ -316,6 +329,14 @@ class MaterialBuilder():
           'container' : {
               "width" : "none"
           }
+        },
+        'MuiAccordionSummary' : {
+          'content' : {
+            'padding': '20px',
+            '&$expanded': {
+              'padding': '20px',
+            },
+          },    
         },
         'MuiExpansionPanelSummary':{
           'expandIcon' : {
@@ -413,8 +434,22 @@ class MaterialBuilder():
             '@media (min-width:600px)':{
                 'min-width' : '90px',
                 'padding' : '2px'                
-             }
+            }
           }
+        },
+        'MuiAccordionSummary' : {
+          'content' : {
+            "margin": "0px",
+            "&$expanded": {
+              "margin": "0px",
+            }
+          },          
+          'root' : {
+            "min-height": "20px",
+            "&$expanded": {
+              "min-height" : "20px"
+            }
+          },
         }
       },  
     }
@@ -422,7 +457,7 @@ class MaterialBuilder():
   def ThemeProvider(Component, theme):  
     Component.addPropVariable("createMuiTheme", {
         "type":"func", 
-        "defaultValue": "() => {return Material.createMuiTheme(" + json.dumps(theme) + ");}"
+        "defaultValue": "() => {return Material.createTheme(" + json.dumps(theme) + ");}"
     })
     ThemeProvider = TeleportElement(MaterialContent(elementType="ThemeProvider"))
     ThemeProvider.content.attrs["theme"] = {

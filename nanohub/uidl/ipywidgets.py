@@ -87,16 +87,8 @@ def buildWidget(Project, *args, **kwargs):
     js = ""
     js += "require.config({" + eol
     js += "  paths: {" + eol
-    js += "    'react': 'https://unpkg.com/react@16.8.6/umd/react.development'," + eol
-    js += "    'react-dom': 'https://unpkg.com/react-dom@16.8.6/umd/react-dom.development'," + eol
-    js += "    'material-ui': 'https://unpkg.com/@material-ui/core@latest/umd/material-ui.development'," + eol
-    js += "    'plotlycomponent': 'https://unpkg.com/react-plotly.js@2.3/dist/create-plotly-component'," + eol
-    js += "    'plotly': 'https://cdn.plot.ly/plotly-1.52.0.min'," + eol
-    js += "    'math': 'https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min'," + eol
-    js += "    'axios': 'https://unpkg.com/axios/dist/axios.min'," + eol
-    js += "    'localforage' : 'https://www.unpkg.com/localforage@1.7.3/dist/localforage.min'," + eol
-    js += "    'number-format': 'https://unpkg.com/react-number-format@4.3.1/dist/react-number-format'," + eol
-    js += "    'prop-types': 'https://unpkg.com/prop-types@15.6/prop-types.min'" + eol
+    for k,v in self.libraries.items():
+        js += "    '" + k + "': '" + v +"',\n"
     js += "  }" + eol
     js += "});" + eol
     js += "require.undef('" + component + "')" + eol
@@ -106,6 +98,7 @@ def buildWidget(Project, *args, **kwargs):
     js += "    'react', " + eol
     js += "    'react-dom'," + eol
     js += "    'material-ui'," + eol
+    js += "    'materiallab-ui'," + eol
     js += "    'number-format'," + eol
     js += "    'axios'," + eol
     js += "    'localforage'," + eol
@@ -119,6 +112,7 @@ def buildWidget(Project, *args, **kwargs):
     js += "    React, " + eol
     js += "    ReactDOM," + eol
     js += "    Material," + eol
+    js += "    MaterialLab," + eol
     js += "    Format," + eol
     js += "    Axios," + eol
     js += "    LocalForage," + eol
@@ -205,7 +199,9 @@ def buildWidget(Project, *args, **kwargs):
     js += "          for (let [key, value] of Object.entries(state)) {" + eol
     js += "            backbone.model.set(key, value);" + eol
     js += "          }" + eol
-    js += "          backbone.model.save_changes();" + eol
+    js += "          try {;" + eol
+    js += "            backbone.model.save_changes();" + eol
+    js += "          } catch (error) { console.log(error); }" + eol
     js += "          orig.apply(this, [state, callback]);" + eol
     js += "        }" + eol
     for i in serializers:   

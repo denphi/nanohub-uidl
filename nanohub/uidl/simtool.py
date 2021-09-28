@@ -164,6 +164,10 @@ class SimtoolBuilder():
       js += "  if( hash_q == null ){" + eol    
     js += "  self.props.onStatusChange({'target':{ 'value' : 'Parsing Tool Schema' } } );" + eol
     js += "  var schema = JSON.parse(" + store_name + ".getItem('nanohub_tool_schema'));" + eol
+    js += "  if(!schema){" + eol;
+    js += "    self.buildSchema()" + eol;
+    js += "    schema = JSON.parse(" + store_name + ".getItem('nanohub_tool_schema'));" + eol
+    js += "  }" + eol;
     js += "  var inputs = {};" + eol;
     js += "  for (const id in schema.inputs) {" + eol;
     js += "    if (id in state){" + eol;
@@ -187,31 +191,47 @@ class SimtoolBuilder():
     js += "  var url = '" + url + "/run';" + eol 
     js += "  self.props.onStatusChange({'target':{ 'value' : 'Submitting Simulation' } } );" + eol
     js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol  
-    js += "  Axios.request(url, options)" + eol    
-    js += "  .then(function(response){" + eol
-    js += "    var data = response.data;" + eol
-    #js += "    console.log(data);" + eol
-    js += "    if(data.code){" + eol    
-    js += "      if(data.message){" + eol    
-    js += "        self.props.onError( '(' + data.code + ') ' +data.message );" + eol
-    js += "      } else {" + eol    
-    js += "        self.props.onError( '(' + data.code + ') Error sending the simulation' );" + eol
-    js += "      } " + eol    
-    js += "    }else{" + eol    
-    js += "      if(data.id){" + eol 
-    js += "        if('outputs' in data){" + eol
-    js += "          self.props.onLoad(self);" + eol      
-    js += "          self.props.onLoadResults(self, data.id, data['outputs']);" + eol
-    js += "        } else {" + eol
-    js += "          setTimeout(function(){ self.props.onCheckSession(self, data.id, 10) }, 4000);" + eol
-    js += "        }" + eol
-    js += "      } else {" + eol    
-    js += "        self.props.onError( 'Error submiting the simulation, session not found' );" + eol
+    js += "  try{" + eol    
+    js += "    Axios.request(url, options)" + eol    
+    js += "    .then(function(response){" + eol
+    js += "      var data = response.data;" + eol
+    #js += "      console.log(data);" + eol
+    js += "      if(data.code){" + eol    
+    js += "        if(data.message){" + eol    
+    js += "          self.props.onError( '(' + data.code + ') ' +data.message );" + eol
+    js += "        } else {" + eol    
+    js += "          self.props.onError( '(' + data.code + ') Error sending the simulation' );" + eol
+    js += "        } " + eol    
+    js += "      }else{" + eol    
+    js += "        if(data.id){" + eol 
+    js += "          if('outputs' in data){" + eol
+    js += "            self.props.onLoad(self);" + eol      
+    js += "            self.props.onLoadResults(self, data.id, data['outputs']);" + eol
+    js += "          } else {" + eol
+    js += "            setTimeout(function(){ self.props.onCheckSession(self, data.id, 10) }, 5000);" + eol
+    js += "          }" + eol
+    js += "        } else {" + eol    
+    js += "          self.props.onError( 'Error submiting the simulation, session not found' );" + eol
+    js += "        }" + eol    
     js += "      }" + eol    
-    js += "    }" + eol    
-    js += "  }).catch(function(error){" + eol
-    js += "    self.props.onError(String(error));" + eol      
-    js += "  })"
+    js += "    }).catch(function(error){" + eol     
+    js += "      if (error.response){" + eol 
+    js += "        if (error.response.data){" + eol 
+    js += "          if (error.response.data.message){" + eol 
+    js += "            self.props.onError(String(error.response.data.message));" + eol 
+    js += "          } else {" + eol 
+    js += "            self.props.onError(String(error.response.data));" + eol 
+    js += "          }" + eol 
+    js += "        } else {" + eol 
+    js += "          self.props.onError(String(error.response));" + eol      
+    js += "        }" + eol 
+    js += "      } else {" + eol 
+    js += "        self.props.onError(String(error));" + eol 
+    js += "      }" + eol 
+    js += "    });" + eol 
+    js += "  } catch (err) {" + eol 
+    js += "    self.props.onError(String(err));" + eol      
+    js += "  }" + eol 
     if (use_cache):    
       js += "  } else { " + eol
       js += "    self.props.onStatusChange({'target':{ 'value' : 'Loading from local Cache' } } );" + eol
@@ -235,42 +255,54 @@ class SimtoolBuilder():
     js += "    str.push(encodeURIComponent(p) + '=' + encodeURIComponent(session_json[p]));" + eol
     js += "  }" + eol
     js += "  let data =  str.join('&');" + eol
-    js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol  
-    js += "  Axios.request(url, options)" + eol
-    js += "  .then(function(response){" + eol
-    js += "    var status = response.data;" + eol
-    js += "    if (status['success']){" + eol
-    js += "      if ('status' in status){" + eol
-    js += "        if(status['status'] == 'error'){" + eol
-    js += "          self.props.onError(status['status']);" + eol
-    js += "        }" + eol
-    js += "        else {" + eol
-    js += "          self.props.onStatusChange({'target':{ 'value' : status['status'] } } );" + eol
-    js += "          if('outputs' in status && status['outputs']){" + eol
-    js += "            self.props.onLoad(self);" + eol
-    js += "            self.props.onLoadResults(self, session_id, status['outputs']);" + eol
-    js += "          } else {" + eol
-    js += "            if (reload > 0){" + eol
-    js += "              setTimeout(function(){self.props.onCheckSession(self, session_id, reload)},2000);" + eol
+    js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol 
+    js += "  try{" + eol    
+    js += "    Axios.request(url, options)" + eol
+    js += "    .then(function(response){" + eol
+    js += "      var status = response.data;" + eol
+    js += "      if (status['success']){" + eol
+    js += "        if ('status' in status){" + eol
+    js += "          if(status['status'] == 'error'){" + eol
+    js += "            self.props.onError(status['status']);" + eol
+    js += "          }" + eol
+    js += "          else {" + eol
+    js += "            self.props.onStatusChange({'target':{ 'value' : status['status'] } } );" + eol
+    js += "            if('outputs' in status && status['outputs']){" + eol
+    js += "              self.props.onLoad(self);" + eol
+    js += "              self.props.onLoadResults(self, session_id, status['outputs']);" + eol
+    js += "            } else {" + eol
+    js += "              if (reload > 0){" + eol
+    js += "                setTimeout(function(){self.props.onCheckSession(self, session_id, reload)},10000);" + eol
+    js += "              }" + eol
     js += "            }" + eol
     js += "          }" + eol
-    js += "        }" + eol
+    js += "        }"
+    js += "      } else if (status['code']){" + eol
+    #js += "        if (status['code'] == 404){" + eol
+    #js += "          setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},8000);" + eol          
+    #js += "        }"
+    #js += "        else if (status['code'] != 200){" + eol
+    js += "          self.props.onError(status['message']);" + eol
+    #js += "        }"
     js += "      }"
-    js += "    } else if (status['code']){" + eol
-    #js += "      if (status['code'] == 404){" + eol
-    #js += "        setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},8000);" + eol          
-    #js += "      }"
-    #js += "      else if (status['code'] != 200){" + eol
-    js += "        self.props.onError(status['message']);" + eol
-    #js += "      }"
-    js += "    }"
-    js += "  }).catch(function(error){" + eol
-    #js += "    if (reload > 0 && String(error).includes('404')){" + eol    
-    #js += "      setTimeout(function(){self.props.onCheckSession(self, session_id, reload-1)},8000);" + eol
-    #js += "    } else {" + eol
-    js += "      self.props.onError(String(error));" + eol
-    #js += "    }" + eol
-    js += "  })" + eol
+    js += "    }).catch(function(error){" + eol
+    js += "      if (error.response){" + eol 
+    js += "        if (error.response.data){" + eol 
+    js += "          if (error.response.data.message){" + eol 
+    js += "            self.props.onError(String(error.response.data.message));" + eol 
+    js += "          } else {" + eol 
+    js += "            self.props.onError(String(error.response.data));" + eol 
+    js += "          }" + eol 
+    js += "        } else {" + eol 
+    js += "          self.props.onError(String(error.response));" + eol      
+    js += "        }" + eol 
+    js += "      } else {" + eol 
+    js += "        self.props.onError(String(error));" + eol 
+    js += "      }" + eol 
+    js += "    })" + eol
+    js += "  } catch (err) {" + eol 
+    js += "    self.props.onError(String(err));" + eol      
+    js += "  }" + eol 
     js += "}" + eol
 
     
@@ -701,20 +733,42 @@ class SimtoolBuilder():
     eol = "\n"
     js = ""
     js += "async (self) => {"
-    js += "  var header_token = { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': '*/*' };" + eol
+    js += "  var nanohub_token = " + store_name + ".getItem('nanohub_token');" + eol
+    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': '*/*' };" + eol
     js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'GET' };" + eol
     js += "  var url = '" + url + "/get/" + toolname + "/" + str(revision) + "';" + eol
     js += "  let params = {};"     + eol
-    js += "  let selfr = self;"     + eol
-    js += "  await Axios.request(url, options)" + eol
-    js += "  .then(function(response){" + eol
-    js += "    var data = response.data;"  + eol
-    js += "    var schema = data.tool;"  + eol
-    js += "    " + store_name + ".setItem('nanohub_tool_schema', JSON.stringify(schema));" + eol
-    js += "    selfr.props.onLoadSchema(selfr)"
-    js += "  }).catch(function(error){" + eol
+    js += "  let selfr = self;"     + eol 
+    js += "  try{" + eol    
+    js += "    await Axios.request(url, options)" + eol
+    js += "    .then(function(response){" + eol
+    js += "      var data = response.data;"  + eol
+    js += "      var schema = data.tool;"  + eol
+    js += "      var schema_json = JSON.stringify(schema);"  + eol
+    js += "      if (schema_json){"  + eol
+    js += "        " + store_name + ".setItem('nanohub_tool_schema', schema_json);" + eol
+    js += "        selfr.props.onLoadSchema(selfr)"
+    js += "      } else {" + eol
+    js += "        selfr.props.onSchemaError(selfr)"
+    js += "      }" + eol
+    js += "    }).catch(function(error){" + eol
+    js += "      if (error.response){" + eol 
+    js += "        if (error.response.data){" + eol 
+    js += "          if (error.response.data.message){" + eol 
+    js += "            selfr.props.onSchemaError(String(error.response.data.message));" + eol 
+    js += "          } else {" + eol 
+    js += "            selfr.props.onSchemaError(String(error.response.data));" + eol 
+    js += "          }" + eol 
+    js += "        } else {" + eol 
+    js += "          selfr.props.onSchemaError(String(error.response));" + eol      
+    js += "        }" + eol 
+    js += "      } else {" + eol 
+    js += "        selfr.props.onSchemaError(String(error));" + eol 
+    js += "      }" + eol 
+    js += "    });" + eol
+    js += "  } catch (err){" + eol
     js += "    selfr.props.onSchemaError(selfr)"
-    js += "  });" + eol
+    js += "  }" + eol
     js += "}" + eol
     
     Component.addPropVariable("buildSchema", {"type":"func", 'defaultValue' :js})   
