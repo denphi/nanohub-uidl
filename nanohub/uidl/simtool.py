@@ -165,7 +165,7 @@ class SimtoolBuilder():
     js += "  self.props.onStatusChange({'target':{ 'value' : 'Parsing Tool Schema' } } );" + eol
     js += "  var schema = JSON.parse(" + store_name + ".getItem('nanohub_tool_schema'));" + eol
     js += "  if(!schema){" + eol;
-    js += "    self.buildSchema()" + eol;
+    js += "    self.props.buildSchema()" + eol;
     js += "    schema = JSON.parse(" + store_name + ".getItem('nanohub_tool_schema'));" + eol
     js += "  }" + eol;
     js += "  var inputs = {};" + eol;
