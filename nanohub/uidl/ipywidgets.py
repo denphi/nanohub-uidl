@@ -256,6 +256,8 @@ def buildWidget(Project, *args, **kwargs):
     js += "      " + component + "Model" + eol
     js += "    };" + eol
     js += "});" + eol
+    if kwargs.get("verbose", False):
+        print(js)
     #out = widgets.Output()
     #display(out)
     #with out:
@@ -267,7 +269,19 @@ def buildWidget(Project, *args, **kwargs):
                 return;
         #widgets.Widget._handle_msg(s,c,b)
 
-    def do_init(s, v, f, **k):
+    def do_init(s, v, f, **k):    
+        default_styles = "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>"
+        default_styles += "<style>.p-Widget * {font-size: unset;}</style>"
+        default_styles += "<style>div.output_subarea {padding: 0px;}</style>"
+        
+        display(
+            widgets.HTML(
+                kwargs.get("styles", default_styles),
+                layout=widgets.Layout(display="none")
+            )
+        )
+        display(Javascript(js))
+
         widgets.DOMWidget.__init__(s,**k)
         for i,j in f.items():
             setattr(s,'_handlers_'+ i, widgets.widget.CallbackDispatcher())
@@ -280,6 +294,7 @@ def buildWidget(Project, *args, **kwargs):
         
         for i,j in v.items():
             setattr(s,i,k.get(i,j))
+
         
     def do__setattr(s,n,v,d):
         if (hasattr(s, '__validate')):
@@ -314,14 +329,7 @@ def buildWidget(Project, *args, **kwargs):
     attrs['_handle_uidl_msg'] =  lambda s,c,b, : do_handle_msg(s, default, functions, c, b)
     attrs['__setattr__'] =  lambda s,n,v, d=default : do__setattr (s,n,v,d) 
 
-    
-    default_styles = "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>"
-    display(HTML("<style>.p-Widget * {font-size: unset;}</style>"))
-    display(HTML(kwargs.get("styles", default_styles)))
-    if kwargs.get("verbose", False):
-        print(js)
-    display(Javascript(js))
-                    
+                        
     return type(component + 'Widget', (widgets.DOMWidget,), attrs)
 
 def parseJSX(document, *args, **kwargs):
