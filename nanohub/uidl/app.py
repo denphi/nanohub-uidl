@@ -1,5 +1,6 @@
 from .teleport import *
 from .rappture import *
+from .simtool import *
 from .material import *
 import numpy as np
 
@@ -575,7 +576,7 @@ class FormHelper():
 
 class AppBuilder():
 
-  def Results(Component, *args, **kwargs):
+  '''def Results(Component, *args, **kwargs):
     results = kwargs.get("results", {});
     onClick = kwargs.get("onClick", []);
     onLoad = kwargs.get("onLoad", []);
@@ -606,7 +607,44 @@ class AppBuilder():
           }, 
           onClickButton = onClick + v_action + onLoad
         )))
-    return Grid
+    return Grid'''
+
+  def Results(Component, *args, **kwargs):
+    results = kwargs.get("results", {});
+    onClick = kwargs.get("onClick", []);
+    onLoad = kwargs.get("onLoad", []);
+    Component.addStateVariable("open_plot", {"type":"string", "defaultValue": list(results.keys())[0]})
+    ToggleButtonGroup = TeleportElement(MaterialLabContent(elementType="ToggleButtonGroup"))
+    ToggleButtonGroup.content.style = { 'width' : '100%', 'flexDirection': 'column', 'display': 'inline-flex' }
+    ToggleButtonGroup.content.attrs["orientation"] = "vertical"
+    ToggleButtonGroup.content.attrs["exclusive"] = True
+    
+    ToggleButtonGroup.content.attrs['value'] = {
+        "type": "dynamic",
+        "content": {
+         "referenceType": "state",
+         "id": "open_plot"
+        }
+    }
+
+    for k,v in results.items():
+        v_action = []
+        if isinstance(v["action"], dict):
+            v_action.append(v["action"])
+        elif isinstance(v["action"], list):
+            for va in v["action"]:
+                v_action.append(va)
+        v_action.append({ "type": "stateChange", "modifies": "open_plot","newState":  k })
+        ToggleButton = TeleportElement(MaterialLabContent(elementType="ToggleButton"))
+        ToggleButton.content.attrs['value'] = k
+        ToggleButton.content.events['click'] = onClick + v_action + onLoad
+        Typography = TeleportElement(MaterialContent(elementType="Typography"))
+        Typography.addContent(TeleportStatic(content=v["title"]))
+        ToggleButton.addContent(Typography)
+        ToggleButtonGroup.addContent(ToggleButton)
+
+    return ToggleButtonGroup
+
 
   def createGroups(Component, layout, fields, *args, **kwargs):
     Group = None
@@ -872,14 +910,26 @@ class AppBuilder():
             params[k] = param
             parameters[k] = v["default_value"]
     Tabs = AppBuilder.createGroups(NComponent, layout, params)
-        
-    runSimulation = RapptureBuilder.onSimulate(
-      tp,
-      NComponent,
-      toolname=kwargs.get("toolname", ""),
-      url=kwargs.get("url", None),
-      jupyter_cache=kwargs.get("jupyter_cache", None),
-    )
+    
+    if kwargs.get("runSimulation", "rappture") == "rappture":
+        runSimulation = RapptureBuilder.onSimulate(
+          tp,
+          NComponent,
+          toolname=kwargs.get("toolname", ""),
+          url=kwargs.get("url", None),
+          jupyter_cache=kwargs.get("jupyter_cache", None),
+        )
+    else:
+        runSimulation = SimtoolBuilder.onSimulate(
+          tp,
+          NComponent,
+          toolname=kwargs.get("toolname", ""),
+          revision=kwargs.get("revision", ""),
+          url=kwargs.get("url", None),
+          outputs=kwargs.get("outputs", []),
+          jupyter_cache=kwargs.get("jupyter_cache", None),
+        )
+    
     runSimulation.append({
         "type": "propCall2",
         "calls": "onClick",
@@ -904,16 +954,16 @@ class AppBuilder():
     NComponent.node.addContent(Tabs)
     NComponent.addPropVariable("parameters", {"type":"object", 'defaultValue' : parameters})    
     Component.addStateVariable("parameters", {"type":"object", 'defaultValue' : parameters})
-    NsopticsSettings = TeleportElement(TeleportContent(elementType="NsopticsSettingsComponent"))
-    NsopticsSettings.content.attrs['parameters'] = {
+    AppSettings = TeleportElement(TeleportContent(elementType="AppSettingsComponent"))
+    AppSettings.content.attrs['parameters'] = {
       "type": "dynamic",
       "content": {
         "referenceType": "state",
         "id": "parameters"
       }    
     }
-    tp.components["NsopticsSettingsComponent"] = NComponent
-    return NsopticsSettings
+    tp.components["AppSettingsComponent"] = NComponent
+    return AppSettings
 
 
   def ColorSliders(tp, Component, *args, **kwargs):

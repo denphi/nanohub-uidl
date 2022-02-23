@@ -13,6 +13,7 @@ class Auth():
     AComponent.addStateVariable("typepassword", {"type":"string", 'defaultValue' : "password"})  
     AComponent.addStateVariable("loading", {"type":"boolean", 'defaultValue' : False})  
     AComponent.addStateVariable("message", {"type":"string", 'defaultValue' : ""})  
+    # Check the refreshToken stored before showing the dialog if the token refresh is valid change the state
     AComponent.addPropVariable("onLoad", {"type":"func", 'defaultValue' : '''(self)=>{
       self.props.refreshToken(self);
     }'''})
@@ -143,7 +144,7 @@ class Auth():
        client_id=kwargs.get("client_id",""), 
        client_secret=kwargs.get("client_secret",""), 
        url=kwargs.get("url","")
-    )    
+    )     
     Button = MaterialBuilder.Button(
         title = "LOG IN",
         variant = "text", 
@@ -483,3 +484,4 @@ class Auth():
         "args": ['self', '']
       }
     ] 
+

@@ -103,7 +103,12 @@ class TeleportNode():
       react += "''\n"
     else:
       if self.type == "static":
-        react += " '" + str(self.content).replace("'", "\"") + "' "
+        value = self.content
+        if isinstance(value, str) and value.startswith("$"):
+            value = value.replace("$", "")
+        else:
+            value = json.dumps(value)        
+        react += " " + str(value).replace("'", "\"") + " "
       elif self.type == "dynamic":
         if ("referenceType" in self.content and self.content["referenceType"] == "state"):
           reference = "self.state." + self.content["id"] + "";
@@ -376,6 +381,12 @@ class TeleportComponent():
     react += "    this.props.onLoad(self);\n"
     react += "  }\n"
     react += "}\n"
+    react += "componentDidUpdate(){\n"
+    react += "  let self=this;\n"
+    react += "  if (this.props.onUpdate){\n"
+    react += "    this.props.onUpdate(self);\n"
+    react += "  }\n"
+    react += "}\n"
     react += "render(){\n"
     react += "  let self=this;\n"
     react += "  return " + self.node.buildReact() + ";\n"
@@ -402,6 +413,19 @@ class TeleportProject():
       self.root = TeleportComponent("MainComponent", content);
       self.components = {};
       self.ref = uuid.uuid4()
+      self.libraries = {
+        'react': 'https://unpkg.com/react@16.8.6/umd/react.production.min',
+        'react-dom': 'https://unpkg.com/react-dom@16.8.6/umd/react-dom.production.min',
+        'material-ui': 'https://unpkg.com/@material-ui/core@latest/umd/material-ui.production.min',
+        'materiallab-ui': 'https://cdn.jsdelivr.net/npm/material-ui-lab-umd@latest/material-ui-lab.production.min',
+        'plotlycomponent': 'https://unpkg.com/react-plotly.js@2.3/dist/create-plotly-component',
+        'plotly': 'https://cdn.plot.ly/plotly-latest.min',
+        'math': 'https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min',
+        'axios': 'https://unpkg.com/axios/dist/axios.min',
+        'localforage' : 'https://www.unpkg.com/localforage@1.7.3/dist/localforage.min',
+        'number-format': 'https://unpkg.com/react-number-format@4.3.1/dist/react-number-format',
+        'prop-types': 'https://unpkg.com/prop-types@15.6/prop-types.min',
+      }
 
   def addComponent(self, name, comp, *args, **kwargs):
     if name not in self.components:
@@ -451,25 +475,17 @@ class TeleportProject():
     react += "<script type='text/javascript'>\n"
     react += "requirejs.config({\n"
     react += "    paths: {\n"
-    react += "        'react': 'https://unpkg.com/react@16.8.6/umd/react.development',\n"
-    react += "        'react-dom': 'https://unpkg.com/react-dom@16.8.6/umd/react-dom.development',\n"
-    react += "        'material-ui': 'https://unpkg.com/@material-ui/core@latest/umd/material-ui.development',\n"
-    react += "        'plotlycomponent': 'https://unpkg.com/react-plotly.js@2.3/dist/create-plotly-component',\n"
-    react += "        'plotly': 'https://cdn.plot.ly/plotly-latest.min',\n"
-    react += "        'math': 'https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min',\n"
-    react += "        'axios': 'https://unpkg.com/axios/dist/axios.min',\n"
-    react += "        'localforage' : 'https://www.unpkg.com/localforage@1.7.3/dist/localforage.min',\n"    
-    react += "        'number-format': 'https://unpkg.com/react-number-format@4.3.1/dist/react-number-format',\n"   
-    react += "        'prop-types': 'https://unpkg.com/prop-types@15.6/prop-types.min',\n"
+    for k,v in self.libraries.items():
+        react += "        '" + k + "': '" + v +"',\n"
     react += "    }\n"
     react += "});\n"
     react += "requirejs(['react', 'react-dom'], function(React, ReactDOM) {\n"
     react += "  window.React = React\n"
     react += "  let _react = React\n"
-    react += "  requirejs(['material-ui', 'axios', 'localforage', 'prop-types'], function(Material, Axios, LocalForage, PropTypes) {\n"    
+    react += "  requirejs(['material-ui', 'materiallab-ui', 'axios', 'localforage', 'prop-types'], function(Material, MaterialLab, Axios, LocalForage, PropTypes) {\n"    
     react += "    _react.PropTypes = PropTypes\n"
     react += "    requirejs(['plotlycomponent', 'plotly', 'math', 'number-format'], function(PlotlyComponent, Plotly, math, Format) {\n"
-    react += "      window.React = React\n"
+    react += "      window.React = React;\n"
     react += "      const Plot = PlotlyComponent.default(Plotly);\n";
     react += self.globals.customCode['body'].buildReact()
     react += self.globals.buildReact();
@@ -571,12 +587,17 @@ class TeleportContent():
     v = ""
     for func in list:   
       if "type" in func and func["type"] == "stateChange":
+        callback_d = "(e)=>{}"
+        state_d = "{}"
+        if ("callbacks" in func):
+          callback_d = "(e)=>{" + TeleportContent.parseFunctionsList(func["callbacks"]) +  "}"
         if (isinstance(func["newState"], str) and func["newState"] == "$toggle"):
-          v += "self.setState({'" + str(func["modifies"]) + "': !self.state." + str(func["modifies"]) + "}); "
+          state_d = "{'" + str(func["modifies"]) + "': !self.state." + str(func["modifies"]) + "}"
         elif (isinstance(func["newState"], str) and func["newState"].startswith("$")):
-          v += "self.setState({'" + str(func["modifies"]) + "':" + func["newState"].replace("$","") + "}); "
+          state_d = "{'" + str(func["modifies"]) + "':" + func["newState"].replace("$","") + "}"
         else:
-          v += "self.setState({'" + str(func["modifies"]) + "':" + json.dumps(func["newState"]) + "}); "
+          state_d = "{'" + str(func["modifies"]) + "':" + json.dumps(func["newState"]) + "}"
+        v += "self.setState(" + state_d + "," +  callback_d + " );"
       elif "type" in func and func["type"] == "logging":
         v += "console.log('" + str(func["modifies"]) + "', " + str(json.dumps(func["newState"])) + "); "
       elif "type" in func and func["type"] == "propCall":
@@ -637,7 +658,9 @@ class TeleportContent():
       v += "}"
       if v != "function(){}": 
         react += sep + "'"+ event_rename + "': " + v + ""
-    if len(self.style) > 0:
+    if isinstance(self.style, str) and self.style.startswith("$"):
+      react += sep + "'style': " + self.style.replace("$", "") + ""
+    elif len(self.style) > 0:
       react += sep + "'style': " + json.dumps(self.style) + ""
     react += "}"
 
