@@ -87,7 +87,7 @@ def buildWidget(Project, *args, **kwargs):
     js = ""
     js += "require.config({" + eol
     js += "  paths: {" + eol
-    for k,v in self.libraries.items():
+    for k,v in Project.libraries.items():
         js += "    '" + k + "': '" + v +"',\n"
     js += "  }" + eol
     js += "});" + eol
