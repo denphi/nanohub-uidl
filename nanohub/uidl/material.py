@@ -1,17 +1,61 @@
 from .teleport import *
 
 class MaterialContent(TeleportContent):
-
+    
+  def __init__(self, *args, **kwargs):
+    self.dependency = {
+        "type": "package",
+        "path": "@material-ui/core",
+        "version": "latest",
+        "meta": { 
+            "namedImport" : True
+        }
+    }
+    #'material-ui': 'https://unpkg.com/@material-ui/core@latest/umd/material-ui.production.min',
+    super().__init__(self, *args, **kwargs)
+    
+    
   def buildElementType(self):   
-    elementType = self.elementType
+    elementType = self.semanticType
+    if elementType is None:
+        elementType = self.elementType
     return "Material." + elementType
+
+  def __json__(self):
+    tjson = super().__json__()
+    tjson["dependency"] = self.dependency
+    if self.elementType != None:
+        tjson["semanticType"] = "Material." + self.elementType
+        tjson["dependency"]["meta"]["originalName"] = self.elementType
+    return tjson
 
 
 class MaterialLabContent(TeleportContent):
-
+  def __init__(self, *args, **kwargs):
+    self.dependency = {
+        "type": "package",
+        "path": "material-ui-lab-umd",
+        "version": "latest",
+        "meta": { 
+            "namedImport" : True
+        }
+    }
+    #'materiallab-ui': 'https://cdn.jsdelivr.net/npm/material-ui-lab-umd@latest/material-ui-lab.production.min',
+    super().__init__(self, *args, **kwargs)
+   
   def buildElementType(self):   
-    elementType = self.elementType
+    elementType = self.semanticType
+    if elementType is None:
+        elementType = self.elementType
     return "MaterialLab." + elementType
+
+  def __json__(self):
+    tjson = super().__json__()
+    tjson["dependency"] = self.dependency
+    if self.elementType != None:
+        tjson["semanticType"] = "Material." + self.elementType
+        tjson["dependency"]["meta"]["originalName"] = self.elementType
+    return tjson
 
 class MaterialBuilder():
   def AppBar(*args, **kwargs):

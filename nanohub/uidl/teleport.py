@@ -539,6 +539,7 @@ class TeleportProject():
 class TeleportContent():
   def __init__(self, *args, **kwargs):
     self.elementType = kwargs.get("elementType", None)
+    self.semanticType = kwargs.get("semanticType", self.elementType)
     self.attrs = {}
     self.events = {}
     self.style = {}
@@ -562,6 +563,8 @@ class TeleportContent():
       tjson["name"] = self.name
     if self.elementType != None:
       tjson["elementType"] = self.elementType
+    if self.semanticType != None:
+      tjson["semanticType"] = self.semanticType
     if len(self.style) > 0:
       tjson["style"] = self.style
     if len(self.attrs) > 0:
@@ -576,9 +579,13 @@ class TeleportContent():
       return json.dumps(self.__json__())             
 
   def buildElementType(self):   
-    elementType = self.elementType
+    elementType = self.semanticType
+    if elementType is None:
+        elementType = self.elementType
     if elementType == "container":
       elementType = "'div'"
+    elif elementType == "text":
+      elementType = "'span'"
     elif elementType.islower():
       elementType = "'"+elementType+"'"
     return elementType

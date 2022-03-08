@@ -4,7 +4,9 @@ from .rappture import *
 
 class PlotlyContent(TeleportContent):
   def buildElementType(self):   
-    elementType = self.elementType
+    elementType = self.semanticType
+    if elementType is None:
+        elementType = self.elementType
     return "" + elementType
 
     
