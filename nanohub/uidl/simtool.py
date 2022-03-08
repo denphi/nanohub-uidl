@@ -124,6 +124,7 @@ class SimtoolBuilder():
     return Error
 
   def onSimulate(tp, Component, *args, **kwargs):
+    SimtoolBuilder.buildSchema(tp, Component, *args, **kwargs)
     store_name="sessionStore";
     NanohubUtils.storageFactory(tp, store_name=store_name, storage_name="window.sessionStorage") 
     local_storage = "LocalStore"
