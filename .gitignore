@@ -9,4 +9,5 @@ examples/tools/*.html
 examples/tools/auth
 dist
 build
-
+nanohub/remote
+examples/tools/__TMPReact*
