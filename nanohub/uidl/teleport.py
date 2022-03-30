@@ -353,8 +353,10 @@ class TeleportComponent():
             v = "self.props." + content["id"] + "";
           elif ("referenceType" in content and content["referenceType"] == "local"):
             v = "" + content["id"] + "";
-      elif "type" in s:         
-        if (s["type"] == "object"):
+      elif "type" in s:  
+        if isinstance(v, str) and v.startswith("$"):
+          v = v.replace("$","")
+        elif (s["type"] == "object"):
           v = str(json.dumps(v))    
         elif (s["type"] == "string"):
           v = str(json.dumps(str(v))) 

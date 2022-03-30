@@ -3,6 +3,7 @@ from .rappture import *
 from .simtool import *
 from .material import *
 import numpy as np
+import json
 
 class FormHelper():  
   def Number(component, label, description, state, value=0, suffix="",*args, **kwargs):
@@ -37,36 +38,164 @@ class FormHelper():
     }
     return number
 
-  def NumberAsString(component, label, description, state, value=0, suffix="",*args, **kwargs):
-    if (state not in component.stateDefinitions):
-      component.addStateVariable(state, {"type":"string", "defaultValue": value})
-    number = TeleportElement(TeleportContent(elementType="FormatCustomNumber"))
+
+  def StringListAsString(component, label, description, state, value, *args, **kwargs):
+    if isinstance(value, list): 
+      value = [str(v) for v in value]
+    if (state not in component.stateDefinitions):  
+      component.addStateVariable(state, {"type":"array", "defaultValue": value})
+    string = TeleportElement(MaterialContent(elementType="TextField"))
     variant = kwargs.get("variant", "outlined")
-    number.content.attrs["variant"] = variant
-    number.content.attrs["label"] = label
-    number.content.attrs["fullWidth"] = True
-    number.content.attrs["helperText"] = description
-    number.content.attrs["suffix"] = suffix
-    if (kwargs.get("decimalScale", None) is not None):
-        number.content.attrs["decimalscale"] = kwargs.get("decimalScale", 0)
-    number.content.style = { 'margin': '10px 0px 10px 0px'}
-    number.content.events["blur"] = []
-    
+    string.content.attrs["variant"] = variant
+    string.content.attrs["label"] = label
+    string.content.attrs["fullWidth"] = True
+    string.content.attrs["helperText"] = description
+    string.content.style = { 'margin': '10px 0px 10px 0px' }
+    string.content.events["change"] = []
     if kwargs.get("onChange", None) is not None:
-        number.content.events["blur"].append(kwargs.get("onChange", None))
-    number.content.events["blur"].append({
+      string.content.events["change"].append(kwargs.get("onChange", None))
+        
+    string.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
-      "newState": "$e.target.value + '"+ suffix +"'" 
+      "newState": "$e.target.value.split(',')"
     })
-    number.content.attrs["value"] = {
+
+    string.content.attrs["value"] = {
       "type": "dynamic",
       "content": {
         "referenceType": "state",
         "id": state
       }  
     }
-    return number
+    return string
+
+  def NumberListAsString(component, label, description, state, value, *args, **kwargs):
+    if isinstance(value, list): 
+      value = [float(v) for v in value]
+    if (state not in component.stateDefinitions):  
+      component.addStateVariable(state, {"type":"array", "defaultValue": value})
+    string = TeleportElement(MaterialContent(elementType="TextField"))
+    variant = kwargs.get("variant", "outlined")
+    string.content.attrs["variant"] = variant
+    string.content.attrs["label"] = label
+    string.content.attrs["fullWidth"] = True
+    string.content.attrs["helperText"] = description
+    string.content.style = { 'margin': '10px 0px 10px 0px' }
+    string.content.events["change"] = []
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
+        
+    string.content.events["change"].append({
+      "type": "stateChange",
+      "modifies": state,
+      "newState": "$e.target.value.split(',').map(x => Number.isInteger(Number(x)) ? Number(x).toFixed(1) : Number(x))"
+    })
+
+    string.content.attrs["value"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": state
+      }  
+    }
+    return string
+
+  def IntListAsString(component, label, description, state, value, *args, **kwargs):
+    if isinstance(value, list): 
+      value = [int(v) for v in value]
+    if (state not in component.stateDefinitions):  
+      component.addStateVariable(state, {"type":"array", "defaultValue": value})
+    string = TeleportElement(MaterialContent(elementType="TextField"))
+    variant = kwargs.get("variant", "outlined")
+    string.content.attrs["variant"] = variant
+    string.content.attrs["label"] = label
+    string.content.attrs["fullWidth"] = True
+    string.content.attrs["helperText"] = description
+    string.content.style = { 'margin': '10px 0px 10px 0px' }
+    string.content.events["change"] = []
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
+        
+    string.content.events["change"].append({
+      "type": "stateChange",
+      "modifies": state,
+      "newState": "$e.target.value.split(',').map(x => parseInt(Number(x)))"
+    })
+
+    string.content.attrs["value"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": state
+      }  
+    }
+    return string
+
+  def DictionaryAsString(component, label, description, state, value, *args, **kwargs):
+    if (state not in component.stateDefinitions):  
+      component.addStateVariable(state, {"type":"object", "defaultValue": value})
+    if ("_" + state not in component.stateDefinitions):
+      if isinstance(value,dict) and "type" in value and value["type"] == "dynamic":
+        if ("content" in value):
+          content = value["content"]
+          if ("referenceType" in content and content["referenceType"] == "state"):
+            v = "self.state." + content["id"] + "";
+          elif ("referenceType" in content and content["referenceType"] == "prop"):
+            v = "self.props." + content["id"] + "";
+          elif ("referenceType" in content and content["referenceType"] == "local"):
+            v = "" + content["id"] + "";
+          component.addStateVariable("_" + state, {"type":"string", "defaultValue": "$JSON.stringify(" + v +")"})
+        else : 
+          component.addStateVariable("_" + state, {"type":"string", "defaultValue": "{}"})
+      else:
+        component.addStateVariable("_" + state, {"type":"string", "defaultValue": json.dumps(value)})
+    if ("_e_" + state not in component.stateDefinitions):  
+      component.addStateVariable("_e_" + state, {"type":"boolean", "defaultValue": False})
+    string = TeleportElement(MaterialContent(elementType="TextField"))
+    variant = kwargs.get("variant", "outlined")
+    string.content.attrs["variant"] = variant
+    string.content.attrs["label"] = label
+    string.content.attrs["fullWidth"] = True
+    string.content.attrs["helperText"] = description
+    string.content.style = { 'margin': '10px 0px 10px 0px' }
+    string.content.events["change"] = []
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
+        
+    string.content.events["change"].append({
+      "type": "stateChange",
+      "modifies": "_" + state,
+      "newState": "$(e.target.value)"
+    })
+
+    string.content.events["change"].append({
+      "type": "stateChange",
+      "modifies": state,
+      "newState": "$((o)=>{try {return JSON.parse(o);}catch(e){return {};}})(e.target.value)"
+    }) 
+
+    string.content.events["change"].append({
+      "type": "stateChange",
+      "modifies": "_e_" + state,
+      "newState": "$((o)=>{try {JSON.parse(o); return false;}catch(e){return true;}})(e.target.value)"
+    })
+    
+    string.content.attrs["error"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": "_e_" + state
+      }  
+    }    
+    string.content.attrs["value"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": "_" + state
+      }  
+    }
+    return string
 
   def IntSlider(component, label, description, state, value=0, suffix="",*args, **kwargs):
     if (state not in component.stateDefinitions):
@@ -906,6 +1035,59 @@ class AppBuilder():
                     "args": ["{'id':'" + k + "', 'value':e.target.checked}"]
                   }
                 )
+            elif v["type"] == "DictionaryAsString":
+                param = FormHelper.DictionaryAsString( 
+                  NComponent,
+                  v["label"], 
+                  v["description"], 
+                  k, 
+                  value, 
+                  onChange =  {
+                    "type": "propCall2",
+                    "calls": "onChange",
+                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                  }      
+                )
+            elif v["type"] == "StringListAsString":
+                param = FormHelper.StringListAsString( 
+                  NComponent,
+                  v["label"], 
+                  v["description"], 
+                  k, 
+                  value, 
+                  onChange =  {
+                    "type": "propCall2",
+                    "calls": "onChange",
+                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                  }      
+                )
+            elif v["type"] == "NumberListAsString":
+                param = FormHelper.NumberListAsString( 
+                  NComponent,
+                  v["label"], 
+                  v["description"], 
+                  k, 
+                  value, 
+                  onChange =  {
+                    "type": "propCall2",
+                    "calls": "onChange",
+                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                  }      
+                )
+            elif v["type"] == "IntListAsString":
+                param = FormHelper.IntListAsString( 
+                  NComponent,
+                  v["label"], 
+                  v["description"], 
+                  k, 
+                  value, 
+                  onChange =  {
+                    "type": "propCall2",
+                    "calls": "onChange",
+                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                  }      
+                )
+
         if param is not None:
             params[k] = param
             parameters[k] = v["default_value"]
