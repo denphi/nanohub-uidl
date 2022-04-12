@@ -333,13 +333,11 @@ class SimtoolBuilder():
       js += "        olist_json = '{}';" + eol
       js += "      var cacheList = JSON.parse(olist_json);" + eol
       js += "      let paletteColorsc = [...self.state.paletteColors]" + eol
-    
       js += "      d_state['.color'] = paletteColorsc.shift();" + eol
       js += "      paletteColorsc.push(d_state['.color']);" + eol
       js += "      self.setState({'paletteColors': paletteColorsc});" + eol
       js += "      cacheList[hash_key] = d_state;" + eol
       js += "      var hash_q = await " + cache_store + ".setItem('cache_list', JSON.stringify(cacheList), (e)=>{self.props.onError(e.toString())});" + eol    
-    #js += "      " + local_storage + ".setItem('output_json', JSON.stringify(output));" + eol
     js += "      self.props.onSuccess(self, hash_key)" + eol
     js += "}" + eol
 
@@ -449,7 +447,7 @@ class SimtoolBuilder():
     url = kwargs.get("url", "")    
     eol = "\n"
     js = ""
-    js += "(component, sequence) => {" + eol
+    js += "(component, sequence, normalize=false, start_trace=0) => {" + eol
     js += "  var label = 'TODO';" + eol
     js += "  var min_tr_x = undefined;" + eol
     js += "  var min_tr_y = undefined;" + eol
@@ -466,8 +464,8 @@ class SimtoolBuilder():
     js += "    for (t=0; t<tr.length;t++){" + eol
     js += "      var minx, maxx;" + eol
     js += "      try {" + eol
-    js += "        minx = Math.min.apply(null, tr[t]);" + eol
-    js += "        maxx = Math.max.apply(null, tr[t]);" + eol
+    js += "        minx = Math.min.apply(null, tr[t]['x']);" + eol
+    js += "        maxx = Math.max.apply(null, tr[t]['x']);" + eol
     js += "        if (min_tr_x ==undefined || min_tr_x > minx){" + eol
     js += "          min_tr_x = minx;" + eol
     js += "        }" + eol
@@ -477,19 +475,15 @@ class SimtoolBuilder():
     js += "      } catch(error){}" + eol
     js += "      var miny, maxy;" + eol
     js += "      try {" + eol
-    js += "        miny = Math.min.apply(null, tr[t]);" + eol
-    js += "        maxy = Math.max.apply(null, tr[t]);" + eol
+    js += "        miny = Math.min.apply(null, tr[t]['y']);" + eol
+    js += "        maxy = Math.max.apply(null, tr[t]['y']);" + eol
     js += "        if (min_tr_y ==undefined || min_tr_y > miny){" + eol
-    js += "          min_tr_y = minx;" + eol
+    js += "          min_tr_y = miny;" + eol
     js += "        }" + eol
     js += "        if (max_tr_y ==undefined || max_tr_y < maxy){" + eol
     js += "          max_tr_y = maxy;" + eol
     js += "        }" + eol
     js += "      } catch(error){}" + eol
-    js += "    }" + eol
-    js += "    if (traces.length == 0){" + eol
-    js += "      layout = lay;" + eol
-    js += "      traces = tr.slice(0);" + eol #clone
     js += "    }" + eol
     js += "    if (i in frames){" + eol
     js += "      frames[i].push(...tr.slice(0));" + eol
@@ -498,8 +492,20 @@ class SimtoolBuilder():
     js += "      frames[i] = tr.slice(0);" + eol
     js += "    }" + eol
     js += "  }" + eol
+    
+    js += "    if (traces.length == 0){" + eol
+    js += "      layout = lay;" + eol
+    js += "      traces =frames[ Object.keys(frames)[start_trace]];" + eol #clone
+    js += "    }" + eol
+
     js += "  var frms = [];" + eol
     
+    js += "  if (normalize && !isNaN(min_tr_x) && !isNaN(max_tr_x)){" + eol
+    js += "    layout['xaxis']= {'autorange':false, 'range':[min_tr_x, max_tr_x]};" + eol
+    js += "  } if (normalize && !isNaN(min_tr_y) && !isNaN(max_tr_y)) {" + eol
+    js += "    layout['yaxis']= {'autorange':false, 'range':[min_tr_y, max_tr_y]};" + eol
+    js += "  } " + eol
+            
     js += "  layout['sliders'] = [{" + eol
     js += "    'pad': {t: 30}," + eol
     js += "    'x': 0.05," + eol
@@ -625,7 +631,7 @@ class SimtoolBuilder():
     js += "      ...plt['layout']," + eol    
     js += "      ...layout" + eol    
     js += "    };" + eol    
-    js += "  }" + eol
+    js += "  }" + eol   
     js += "  component.setState({" + eol
     js += "    'data': cdata," + eol
     js += "    'layout': plt['layout']," + eol
@@ -642,6 +648,24 @@ class SimtoolBuilder():
       "args": ['self', '[]']
     }
 
+  def loadDefaultSimulation(tp, component, *args, **kwargs):
+    store_name="sessionStore";
+    NanohubUtils.storageFactory(tp, store_name=store_name)
+    eol = "\n"
+    eol = "\n";
+    js = ""
+    js += "async (self) => {" + eol
+    js += "  if (" + store_name + ".getItem('nanohub_token')){" + eol
+    js += "    self.props.onSimulate(self);" + eol
+    js += "  }" + eol
+    js += "}" + eol
+    component.addPropVariable("loadDefaultSimulation", {"type":"func", "defaultValue": js})    
+    return {
+      "type": "propCall2",
+      "calls": "loadDefaultSimulation",
+      "args": ['e', 'self']
+    }
+
   def loadSequence(tp, component, *args, **kwargs):   
     eol = "\n";
     SimtoolBuilder.plotSequence(tp, component)
@@ -653,7 +677,7 @@ class SimtoolBuilder():
       cache_storage = kwargs.get("cache_storage", "cacheFactory('"+cache_store+"', 'INDEXEDDB')")
       NanohubUtils.storageFactory(tp, store_name=cache_store, storage_name=cache_storage)        
     js = ""
-    js += "async (component, seq, layout, axis_ids) => {" + eol
+    js += "async (component, seq, layout, axis_ids, normalize=false, start_trace=0) => {" + eol
     js += "  var olist_json = await " + cache_store + ".getItem('cache_list');" + eol
     js += "  if (!olist_json || olist_json == '')" + eol
     js += "    olist_json = '{}';" + eol
@@ -679,6 +703,15 @@ class SimtoolBuilder():
     js += "      if (sequence in jsonOutput){" + eol
     js += "        curves = jsonOutput[sequence];" + eol
     js += "        for (const [key, value] of Object.entries(curves)){" + eol
+    js += "          if (key == axis_ids['position']){" + eol
+    js += "            for (key2 in lseq){" + eol
+    js += "              lseq[key2][sequence] = {" + eol
+    js += "                'position':curves[axis_ids['position']]," + eol
+    js += "                'function':curves[axis_ids['function']]" + eol
+    js += "              };" + eol
+    js += "            }" + eol
+    js += "            break;" + eol
+    js += "          }" + eol
     js += "          if (!(key in lseq)){" + eol
     js += "            lseq[key] = {};" + eol
     js += "          }" + eol
@@ -689,10 +722,9 @@ class SimtoolBuilder():
     js += "        }" + eol
     js += "      }" + eol
     js += "    }" + eol
-    js += "    plt = component.props.plotSequence(component, lseq);" + eol
+    js += "    plt = component.props.plotSequence(component, lseq, normalize, start_trace);" + eol
     js += "    cdata = cdata.concat(plt['data']);" + eol
     js += "    plt['frames'].forEach((p) => { p['data'].forEach((v, i, a) => { " + eol
-    #js += "      a[i]['legendgroup'] = hash_key; " + eol
     js += "      a[i]['line']['color']=inputs[hash_key]['.color']; " + eol
     js += "      a[i]['line']['dash'] = dash[i % dash.length];" + eol
     js += "    }); });" + eol    
@@ -702,12 +734,41 @@ class SimtoolBuilder():
     js += "  if (plt === undefined){" + eol    
     js += "    plt = {'layout': {}};" + eol    
     js += "  }" + eol        
-    js += "  if (layout){" + eol    
-    js += "    plt['layout'] = {" + eol    
-    js += "      ...plt['layout']," + eol    
-    js += "      ...layout" + eol    
-    js += "    };" + eol    
-    js += "  }" + eol    
+    js += "  function mergeDeep(target, source) {" + eol   
+    js += "    const isObject = (obj) => obj && typeof obj === 'object';" + eol   
+    js += "    if (!isObject(target) || !isObject(source)) {" + eol   
+    js += "      return source;" + eol   
+    js += "    }" + eol   
+    js += "    Object.keys(source).forEach(key => {" + eol   
+    js += "      const targetValue = target[key];" + eol   
+    js += "      const sourceValue = source[key];" + eol   
+    js += "      if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {" + eol   
+    js += "        target[key] = targetValue.concat(sourceValue);" + eol   
+    js += "      } else if (isObject(targetValue) && isObject(sourceValue)) {" + eol   
+    js += "        target[key] = mergeDeep(Object.assign({}, targetValue), sourceValue);" + eol   
+    js += "      } else {" + eol   
+    js += "        target[key] = sourceValue;" + eol   
+    js += "      }" + eol   
+    js += "    });" + eol   
+    js += "    return target;" + eol   
+    js += "  }" + eol   
+    js += "  if (layout){" + eol   
+    js += "    mergeDeep (plt['layout'], layout);" + eol   
+    js += "    if (layout['xaxis'] && layout['xaxis']['type'] && layout['xaxis']['type'] == 'log'){" + eol
+    js += "      if (plt['layout']['xaxis']['range'][0] == 0){" + eol
+    js += "        plt['layout']['xaxis']['range'][0] = 1e-20;" + eol
+    js += "      }" + eol
+    js += "      plt['layout']['xaxis']['range'][0] = Math.log10(plt['layout']['xaxis']['range'][0]);" + eol
+    js += "      plt['layout']['xaxis']['range'][1] = Math.log10(plt['layout']['xaxis']['range'][1]);" + eol
+    js += "    }" + eol
+    js += "    if (layout['yaxis'] && layout['yaxis']['type'] && layout['yaxis']['type'] == 'log'){" + eol
+    js += "      if (plt['layout']['yaxis']['range'][0] == 0){" + eol
+    js += "        plt['layout']['yaxis']['range'][0] = 1e-20;" + eol
+    js += "      }" + eol
+    js += "      plt['layout']['yaxis']['range'][0] = Math.log10(plt['layout']['yaxis']['range'][0]);" + eol
+    js += "      plt['layout']['yaxis']['range'][1] = Math.log10(plt['layout']['yaxis']['range'][1]);" + eol
+    js += "    }    " + eol
+    js += "  }" + eol  
     js += "  cframes = Object.keys(cframes).map((key, index) => ({" + eol
     js += "    data: cframes[key]," + eol
     js += "    name: key" + eol
@@ -831,7 +892,7 @@ class SimtoolBuilder():
     
     js += "  let vis = selfr.state['visualization']; " + eol
     js += "  if (vis['function'] == 'loadSequence'){" + eol
-    js += "      selfr.props.loadSequence(selfr, vis['dataset'], vis['layout'], vis['parameters']);" + eol
+    js += "      selfr.props.loadSequence(selfr, vis['dataset'], vis['layout'], vis['parameters'], vis['normalize'], vis['start_trace']);" + eol
     js += "  } else if (vis['function'] == 'loadXY'){" + eol
     js += "      selfr.props.loadXY(selfr, vis['dataset'], vis['layout'], vis['parameters']);" + eol
     js += "  }" + eol
