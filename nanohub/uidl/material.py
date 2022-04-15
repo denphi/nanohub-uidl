@@ -1024,7 +1024,8 @@ class MaterialComponents():
     IconButton = TeleportElement(MaterialContent(elementType="IconButton"))
     IconButton.content.attrs["edge"] = "start"
     IconButton.content.attrs["size"] = "small"    
-    
+    IconButton.content.style = {'font-size':'25px'}
+
     IconButton.content.events["click"] = [{        
         "type": "propCall2",
         "calls": "updateState",
@@ -1070,6 +1071,7 @@ class MaterialComponents():
         "calls": "updateState",
         "args": ["self", "index", "'color'", 'self.props.nextColor(self, self.state.colors[index].color)']
     }]        
+    IconButton2.content.style = {'font-size':'25px'}
 
     SvgIcon = TeleportElement(MaterialContent(elementType="SvgIcon")) 
     Path = TeleportElement(TeleportContent(elementType="path"))

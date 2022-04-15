@@ -3,6 +3,7 @@ import requests
 import jsonschema
 import uuid, weakref, os
 from IPython.display import HTML, Javascript, display
+import re
 
 class TeleportCustomCode():
     def __init__(self, *args, **kwargs):
@@ -924,6 +925,11 @@ class NanohubUtils():
     method_name = kwargs.get("method_name", "storageFactory")
     storage_name = kwargs.get("storage_name", "window.sessionStorage")
     store_name = kwargs.get("store_name", "sessionStore")
+    
+    component = tp.project_name    
+    component = "_" + re.sub("[^a-zA-Z0-9]+", "", component) + "_"
+    
+    
     if (kwargs.get("jupyter_cache", None) is not None):
         NanohubUtils.jupyterCache(tp, kwargs.get("jupyter_cache", None))
     eol = "\n";    
@@ -963,11 +969,12 @@ class NanohubUtils():
     js += "    }" + eol;
     js += "  }" + eol;
     js += "  function getItem(name){" + eol;
+    js += "    let n = ' " + component + "' + name" + eol;
     js += "    if (isSupported()) {" + eol;
-    js += "      return getStorage().getItem(name);" + eol;
+    js += "      return getStorage().getItem(n);" + eol;
     js += "    }" + eol;
-    js += "    if (inMemoryStorage.hasOwnProperty(name)) {" + eol;
-    js += "      return inMemoryStorage[name];" + eol;
+    js += "    if (inMemoryStorage.hasOwnProperty(n)) {" + eol;
+    js += "      return inMemoryStorage[n];" + eol;
     js += "    }" + eol;
     js += "    return null;" + eol;
     js += "  }" + eol;
@@ -981,18 +988,20 @@ class NanohubUtils():
     js += "  }" + eol;
 
     js += "  function removeItem(name){" + eol;
+    js += "    let n = ' " + component + "' + name" + eol;
     js += "    if (isSupported()) {" + eol;
-    js += "      getStorage().removeItem(name);" + eol;
+    js += "      getStorage().removeItem(n);" + eol;
     js += "    } else {" + eol;
-    js += "      delete inMemoryStorage[name];" + eol;
+    js += "      delete inMemoryStorage[n];" + eol;
     js += "    }" + eol;
     js += "  }" + eol;
 
     js += "  function setItem(name, value){" + eol;
+    js += "    let n = ' " + component + "' + name" + eol;
     js += "    if (isSupported()) {" + eol;
-    js += "      getStorage().setItem(name, value);" + eol;
+    js += "      getStorage().setItem(n, value);" + eol;
     js += "    } else {" + eol;
-    js += "      inMemoryStorage[name] = String(value);" + eol;
+    js += "      inMemoryStorage[n] = String(value);" + eol;
     js += "    }" + eol;
     js += "  }" + eol;
 
