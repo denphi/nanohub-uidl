@@ -91,6 +91,8 @@ class MaterialBuilder():
         IconButton.content.attrs["edge"] = "start"
         IconButton.content.attrs["color"] = "inherit"
         IconButton.content.attrs["aria-label"] = "menu"
+        IconButton.content.style = {'border' : '2px solid #F2F1F1', 'width':'50px', 'height':'50px', 'border-radius':'50%'}
+
         IconButton.content.events["click"] = [
           {
             "type": "stateChange",
@@ -127,6 +129,8 @@ class MaterialBuilder():
       IconButton.content.attrs["edge"] = "start"
       IconButton.content.attrs["color"] = "inherit"
       IconButton.content.attrs["aria-label"] = "menu"
+      IconButton.content.style = {'border' : '2px solid #F2F1F1', 'width':'50px', 'height':'50px', 'border-radius':'50%'}
+
       if kwargs.get("onClickMenu", None) is not None:
         IconButton.content.events["click"] = kwargs.get("onClickMenu", [])
       Icon = TeleportElement(MaterialContent(elementType="Icon"))
@@ -219,7 +223,7 @@ class MaterialBuilder():
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")
     ExpansionPanelSummary.content.attrs["id"] = kwargs.get("id", kwargs.get("title", ""))
-    ExpansionPanelSummary.content.style = {'backgroundColor' : '#dbeaf0', 'display' : 'flex', 'padding' : '20px' }
+    ExpansionPanelSummary.content.style = {'backgroundColor' : '#dbeaf0', 'display' : 'flex', 'padding' : '5px' }
 
     ExpansionPanelDetails = TeleportElement(MaterialContent(elementType="AccordionDetails"))
     ExpansionPanelDetails.content.style = {"padding" : "0px"}
@@ -374,14 +378,6 @@ class MaterialBuilder():
               "width" : "none"
           }
         },
-        'MuiAccordionSummary' : {
-          'content' : {
-            'padding': '20px',
-            '&$expanded': {
-              'padding': '20px',
-            },
-          },    
-        },
         'MuiExpansionPanelSummary':{
           'expandIcon' : {
               'font-family': 'Material Icons'
@@ -481,36 +477,23 @@ class MaterialBuilder():
             }
           }
         },
-        'MuiAccordionSummary' : {
-          'content' : {
-            "margin": "0px",
-            "&$expanded": {
-              "margin": "0px",
-            }
-          },          
-          'root' : {
-            "min-height": "20px",
-            "&$expanded": {
-              "min-height" : "20px"
-            }
-          },
-        }
       },  
     }
 
   def ThemeProvider(Component, theme):  
-    Component.addPropVariable("createMuiTheme", {
-        "type":"func", 
-        "defaultValue": "() => {return Material.createTheme(" + json.dumps(theme) + ");}"
-    })
+    #Component.addPropVariable("createMuiTheme", {
+    #    "type":"func", 
+    #    "defaultValue": "() => {return Material.createTheme(" + json.dumps(theme) + ");}"
+    #})
     ThemeProvider = TeleportElement(MaterialContent(elementType="ThemeProvider"))
-    ThemeProvider.content.attrs["theme"] = {
-      "type": "dynamic",
-      "content": {
-        "referenceType": "prop",
-        "id": 'createMuiTheme()'
-      }
-    }
+    #ThemeProvider.content.attrs["theme"] = {
+    #  "type": "dynamic",
+    #  "content": {
+    #    "referenceType": "prop",
+    #    "id": 'createMuiTheme()'
+    #  }
+    #}
+    ThemeProvider.content.attrs["theme"] = "$Material.createTheme("+json.dumps(theme)+")"
     return ThemeProvider
 
 
@@ -609,11 +592,13 @@ class MaterialComponents():
     ExpansionPanelSummary.content.attrs["expandIcon"] = "expand_more"
     ExpansionPanelSummary.content.attrs["aria-controls"] = kwargs.get("aria-controls", "panel1a-content")
 
-    SvgIcon = TeleportElement(MaterialContent(elementType="SvgIcon")) 
+    SvgIcon = TeleportElement(MaterialContent(elementType="SvgIcon"))
+
     Path = TeleportElement(TeleportContent(elementType="path"))
     Path.content.attrs["d"] = "$local.icon"
     Path.content.attrs["fill"] = "transparent"
     Path.content.attrs["stroke"] = "currentColor"
+    SvgIcon.content.style = {'font-size':'25px'}
     SvgIcon.addContent(Path)                                             
     ConditionalIcon  = TeleportConditional(SvgIcon) 
     ConditionalIcon.reference = {
@@ -666,7 +651,7 @@ class MaterialComponents():
         }  
     }
 
-    IconButton.content.style = {'border' : '2px solid #F2F1F1', 'width':'50px', 'height':'50px'}
+    IconButton.content.style = {'border' : '2px solid #F2F1F1', 'width':'50px', 'height':'50px', 'border-radius':'50%', 'font-size':'25px'}
     IconButton.content.events["click"] = [
         {
           "type": "stateChange",
@@ -693,7 +678,7 @@ class MaterialComponents():
     IconButton.addContent(SvgIcon2)
     GridItem.addContent(IconButton)
     FormHelperText = TeleportElement(MaterialContent(elementType="FormHelperText"))
-    FormHelperText.content.style = {'marginLeft': '-12px', 'maxWidth': '50px', 'minWidth': '50px', 'overflow': 'hidden'}
+    FormHelperText.content.style = {'margin':'0px -12px', 'maxWidth': '80px', 'minWidth': '80px', 'overflow': 'hidden'}
     FormHelperText.addContent(TeleportDynamic(content={"referenceType": "local","id": "local.name"}))   
     GridItem.addContent(FormHelperText)    
     RepeatButtons = TeleportRepeat(GridItem)

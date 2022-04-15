@@ -265,7 +265,7 @@ class Auth():
     js += "      " + store_name + ".removeItem('nanohub_refresh_token');" + eol
     js += "      selfr.setState({'open' : true, 'loading' : false, 'message' : 'Error authenticating user'});" + eol
     js += "      selfr.props.onError('Error authenticating user');" + eol
-    js += "    })" + eol
+    js += "    });" + eol
     js += "  }" + eol
     js += "}" + eol
     
@@ -364,7 +364,7 @@ class Auth():
     js += "  var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol
     js += "  var url = '" + url + "';" + eol
     js += "  var expiration = " + store_name + ".getItem('nanohub_expires');" + eol
-    js += "  var current_time = Date.now()" + eol
+    js += "  var current_time = Date.now();" + eol
     js += "  if (expiration === null || current_time > expiration){" + eol
     js += "    let selfr = self;" + eol
     js += "    Axios.request(url, options)" + eol

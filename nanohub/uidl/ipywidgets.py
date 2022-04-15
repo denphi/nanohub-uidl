@@ -2,6 +2,7 @@ from .teleport import *
 from .material import *
 from .rappture import *
 from .plotly import *
+import re
 
 import ipywidgets as widgets
 from traitlets import Unicode, Integer, validate, Bool, Float, TraitError, Dict, List, Any, Instance
@@ -9,8 +10,29 @@ import xml, re, json, uuid
 from IPython.display import HTML, Javascript, display
 
 def buildWidget(Project, *args, **kwargs):
-    component = Project.project_name      
+    component = Project.project_name    
+    component = re.sub("[^a-zA-Z]+", "", component)
     Project.root.name_component = component
+    
+    if (kwargs.get("override_styles", True)):
+        Project.root.node.content.style = "${'width':'100%','height':'100%'}"
+        Project.globals.assets.append({"type": "style", "content": "div[role=tooltip] { z-index:100 }"})
+        Project.globals.assets.append({"type": "style", "content": "li[role=option] { font-size:initial; width:100% }"})
+        Project.globals.assets.append({"type": "style", "content": "div.output_subarea {max-width:100%}"})
+        Project.globals.assets.append({"type": "style", "content": "div.cell {padding:0px}"})
+        Project.globals.assets.append({"type": "style", "content": "#ipython_notebook {display:none}"})
+        Project.globals.assets.append({"type": "style", "content": "span#login_widget {position: absolute;left: 14px}"})
+        Project.globals.assets.append({"type": "style", "content": "body > #header {background-color: #eeee;}"})
+        Project.globals.assets.append({"type": "style", "content": ".end_space {display: none}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiIconButton-colorPrimary {  color: rgba(255, 255, 255, 0.87) !important;  background-color: rgba(0, 0, 0, 0.65) !important;}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiIconButton-colorSecondary {  color: rgba(0, 0, 0, 0.87) !important;  background-color: rgba(0, 0, 0, 0.12) !important;}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiFab-primary {  color: rgba(255, 255, 255, 0.87) !important;  background-color: rgba(0, 0, 0, 0.65) !important;}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiFab-secondary {  color: rgba(0, 0, 0, 0.87) !important;  background-color: rgba(0, 0, 0, 0.12) !important;}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiButton-root {padding: 6px 16px !important;text-transform:none !important}"})
+        Project.globals.assets.append({"type": "style", "content": ".MuiSwitch-switchBase {position: absolute !important;top: 9px !important;left: 9px !important;}"})
+
+
+
     eol = "\n";
     
     attrs = {
@@ -27,7 +49,8 @@ def buildWidget(Project, *args, **kwargs):
             attrs[i] = lambda s, c, r=False, m=i : getattr(s,'_handlers_'+ m).register_callback(c, r)            
             functions[i] =  (d['defaultValue'])
             Project.root.propDefinitions[i]['type'] = "func"
-            Project.root.propDefinitions[i]['defaultValue']="(e)=>{ if (event) event.preventDefault(); backbone.send({ event: '" + i + "', 'params' : (" + d['defaultValue'] + ")(e) });}"
+            if 'defaultValue' not in Project.root.propDefinitions[i] or Project.root.propDefinitions[i]['defaultValue'] == "(e)=>{return e; }":
+                Project.root.propDefinitions[i]['defaultValue']="(e)=>{ if (event) event.preventDefault(); backbone.send({ event: '" + i + "', 'params' : (" + d['defaultValue'] + ")(e) });}"
     parseState = ""
     serializers = []
     for i,d in Project.root.stateDefinitions.items():  
@@ -88,17 +111,94 @@ def buildWidget(Project, *args, **kwargs):
     js += "require.config({" + eol
     js += "  paths: {" + eol
     for k,v in Project.libraries.items():
-        js += "    '" + k + "': '" + v +"',\n"
+        if (kwargs.get("jupyter_axios", False) == False or k != "axios"):
+            js += "    '" + k + "': '" + v +"',\n"
     js += "  }" + eol
     js += "});" + eol
-    js += "require.undef('" + component + "')" + eol
-    js += "  define('" + component + "', [" + eol
+    js += "require.undef('" + component + "');" + eol
+
+    js += "define('patchreact', [" + eol
+    js += "    'react'" + eol
+    js += "  ], function(" + eol
+    js += "    React" + eol
+    js += "  ){" + eol
+    js += "      window.React = React;" + eol
+    js += "      return React;" + eol
+    js += "  }" + eol
+    js += ");" + eol
+    
+    if (kwargs.get("jupyter_axios", False)):
+        js += "define('axios', [], function(){" + eol
+        js += "  function fixedEncodeURI(str) {" + eol
+        js += "    return str.replace(/'/g, \"\\\\'\");" + eol
+        #js += "    return encodeURI(str).replace(/[!'()*]/g, function(c) {" + eol
+        #js += "      return '%' + c.charCodeAt(0).toString(16);" + eol
+        #js += "    });" + eol
+        js += "  }" + eol
+        js += "  return {" + eol
+        js += "    'request' : (url, options) => {" + eol
+        js += "       var promise = new Promise( (callback,error) => {" + eol
+        js += "         let code_input = 'import json;import requests;';" + eol
+        js += "         if (options.method && options.method == 'GET') {" + eol
+        js += "           code_input += 'r=requests.get(\\'' + url + '\\'';" + eol
+        js += "         } else if (options.method && options.method == 'POST') {" + eol
+        js += "           code_input += 'r=requests.post(\\'' + url + '\\'';" + eol
+        js += "         } else {" + eol
+        js += "           error('only post or get are supported');" + eol
+        js += "           return; " + eol
+        js += "         }" + eol
+        js += "         if (options.headers) {" + eol
+        js += "           code_input += ', headers=json.loads(\\'' + JSON.stringify(options.headers) + '\\')';" + eol
+        js += "         }" + eol
+        js += "         if (options.data) {" + eol
+        js += "           if (typeof options.data === 'string'){" + eol
+        js += "             code_input += ', data=\\'' + fixedEncodeURI(options.data) + '\\'';" + eol
+        js += "           } else {" + eol
+        js += "             code_input += ', data=\\'' + JSON.stringify(options.data) + '\\'';" + eol
+        js += "           }" + eol
+        js += "         }" + eol
+        js += "         code_input += ');print(r.text)';" + eol
+        #js += "         console.log(code_input);" + eol
+        js += "         let callbacks = {" + eol
+        js += "           iopub : { output : (response) =>{" + eol
+        #js += "             debugger;" + eol
+        js += "             let obj_r = response.content;" + eol
+        #js += "             console.log(obj_r);" + eol
+        js += "             try {" + eol
+        js += "               obj_r = JSON.parse(obj_r.text);" + eol
+        js += "               if (obj_r.code && obj_r.code > 200){" + eol
+        js += "                 error(obj_r.message);" + eol
+        js += "                 return;" + eol
+        js += "               }" + eol
+        js += "             } catch (e) {" + eol
+        js += "               obj_r = obj_r.text;" + eol
+        js += "               if (options.handleAs && options.handleAs == 'json') {" + eol
+        js += "                 error('invalid json response');" + eol
+        js += "                 return;" + eol
+        js += "               }" + eol
+        js += "             }" + eol
+        js += "             if (options.handleAs && options.handleAs == 'json') {" + eol
+        js += "               callback({'data':obj_r});" + eol
+        js += "             } else {" + eol
+        js += "               callback({'data':response.content.text});" + eol
+        js += "             }" + eol
+        js += "           }}" + eol
+        js += "         }" + eol
+        js += "         let kernel = IPython.notebook.kernel;" + eol
+        js += "         let msg_id = kernel.execute(code_input, callbacks, {silent:false});" + eol
+        js += "       });" + eol
+        js += "       return promise;" + eol
+        js += "     }" + eol
+        js += "  };" + eol
+        js += "});" + eol
+    
+    js += "define('" + component + "', [" + eol
     js += "    '@jupyter-widgets/base'," + eol
     js += "    'underscore', " + eol
-    js += "    'react', " + eol
+    js += "    'patchreact', " + eol
     js += "    'react-dom'," + eol
-    js += "    'material-ui'," + eol
     js += "    'materiallab-ui'," + eol
+    js += "    'material-ui'," + eol
     js += "    'number-format'," + eol
     js += "    'axios'," + eol
     js += "    'localforage'," + eol
@@ -111,8 +211,8 @@ def buildWidget(Project, *args, **kwargs):
     js += "    _, " + eol
     js += "    React, " + eol
     js += "    ReactDOM," + eol
-    js += "    Material," + eol
     js += "    MaterialLab," + eol
+    js += "    Material," + eol
     js += "    Format," + eol
     js += "    Axios," + eol
     js += "    LocalForage," + eol
@@ -121,7 +221,13 @@ def buildWidget(Project, *args, **kwargs):
     js += "    Plotly," + eol
     js += "    math" + eol
     js += "  ) {" + eol
-    
+    if (kwargs.get("debugger", False)):
+        js += "        debugger;" + eol
+        
+            
+    js += "    const Plot = PlotlyComponent.default(Plotly);\n";
+
+
 
     js += "    const " + component + "Model = widgets.WidgetModel.extend({}, {" + eol
     js += "        serializers: _.extend({" + eol
@@ -132,12 +238,9 @@ def buildWidget(Project, *args, **kwargs):
     
     js += "    const " + component + "View = widgets.DOMWidgetView.extend({" + eol
     js += "      initialize() {" + eol
-    
-    if (kwargs.get("debugger", False)):
-        js += "        debugger;" + eol
 
     js += "        const backbone = this;" + eol
-    js += "        widgets.DOMWidgetView.prototype.initialize.call(this, arguments);" + eol
+    #js += "        widgets.DOMWidgetView.prototype.initialize.call(this, {});" + eol #TODO arguments does not exist
     for i in serializers:
         js += "        backbone."+i+"_views = new widgets.ViewList(backbone.add_child_model, null, backbone);" + eol
         js += "        backbone._"+i+" = [];" + eol
@@ -165,8 +268,9 @@ def buildWidget(Project, *args, **kwargs):
         js += "  '" + str(k1) + "' : " + v1 + ", " + eol
       js += "  };" + eol
       js += "}" + eol
-
-    js += Project.globals.buildReact();
+        
+    js += Project.globals.customCode['body'].buildReact()
+    js += Project.globals.buildReact()
     js += Project.root.buildReact(Project.root.name_component)
     js += "        const orig = " + Project.root.name_component + ".prototype.setState;" + eol
     js += "        " + Project.root.name_component + ".prototype.onChange = function (model){" + eol
@@ -201,7 +305,9 @@ def buildWidget(Project, *args, **kwargs):
     js += "          }" + eol
     js += "          try {;" + eol
     js += "            backbone.model.save_changes();" + eol
-    js += "          } catch (error) { console.log(error); }" + eol
+    js += "          } catch (error) {" + eol
+    #js += "            console.log(error); " + eol
+    js += "          }" + eol
     js += "          orig.apply(this, [state, callback]);" + eol
     js += "        }" + eol
     for i in serializers:   
@@ -461,7 +567,7 @@ def parseJSX(document, *args, **kwargs):
     return Component;    
     
 def buildJSX(document, *args, **kwargs):
-    component = kwargs.get("component_name", str(uuid.uuid4()) )
+    component = kwargs.get("component_name", re.sub("[^a-zA-Z]+", "", str(uuid.uuid4())))
     component = "UIDL" + component.replace("-","")
     Component = parseJSX(document, *args, **kwargs)
     Project = TeleportProject(component, content=Component)
@@ -482,4 +588,4 @@ def buildJSX(document, *args, **kwargs):
     
     if kwargs.get("verbose", False):
         print(Project.root.buildReact(component))
-    return buildWidget(Project, **kwargs);
+    return buildWidget(Project, override_styles=False, **kwargs);

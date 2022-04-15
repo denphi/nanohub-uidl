@@ -398,7 +398,7 @@ class SimtoolBuilder():
     js += "    for( let ii=0,nn=field['position'].length; ii<nn; ii++){" + eol
     js += "      sortedfield[field['position'][ii]] = field['function'][ii];" + eol
     js += "    }" + eol
-    js += "    sortedkeys = Object.keys(sortedfield);" + eol
+    js += "    let sortedkeys = Object.keys(sortedfield);" + eol
     js += "    sortedkeys.sort((a, b) => a - b);" + eol
     js += "    var sortedvalues = [];" + eol
     js += "    sortedkeys.forEach(i => sortedvalues.push(sortedfield[i]));" + eol
@@ -461,7 +461,7 @@ class SimtoolBuilder():
     js += "    var plt = component.props.buildXYPlotly(component, curves);" + eol
     js += "    var tr = plt['traces'];" + eol
     js += "    var lay = plt['layout'];" + eol
-    js += "    for (t=0; t<tr.length;t++){" + eol
+    js += "    for (let t=0; t<tr.length;t++){" + eol
     js += "      var minx, maxx;" + eol
     js += "      try {" + eol
     js += "        minx = Math.min.apply(null, tr[t]['x']);" + eol
@@ -608,7 +608,7 @@ class SimtoolBuilder():
     js += "    for (var i=0;i<seq.length;i++){" + eol
     js += "      var sequence = seq[i];" + eol
     js += "      if (sequence in jsonOutput){" + eol
-    js += "        curves = jsonOutput[sequence];" + eol
+    js += "        let curves = jsonOutput[sequence];" + eol
     js += "        lseq[sequence] = {" + eol
     js += "          'position':curves[axis_ids['position']]," + eol
     js += "          'function':curves[axis_ids['function']]" + eol
@@ -638,7 +638,8 @@ class SimtoolBuilder():
     js += "    'frames': plt['frames']," + eol
     js += "    'config': {'displayModeBar': true, 'responsive': 'true'}" + eol    
     js += "  });" + eol
-    js += "  window.dispatchEvent(new Event('resize'));" + eol #trying to trigger windows rescale does not work on IE
+    #js += "  window.dispatchEvent(new Event('resize'));" + eol #trying to trigger windows rescale does not work on IE
+    js += "  window.dispatchEvent(new Event('relayout'));" + eol #trying to trigger windows rescale does not work on IE
     js += "}" + eol
     component.addPropVariable("loadXY", {"type":"func", "defaultValue": js})    
     
@@ -701,10 +702,10 @@ class SimtoolBuilder():
     js += "    for (var i=0;i<seq.length;i++){" + eol
     js += "      var sequence = seq[i];" + eol
     js += "      if (sequence in jsonOutput){" + eol
-    js += "        curves = jsonOutput[sequence];" + eol
+    js += "        let curves = jsonOutput[sequence];" + eol
     js += "        for (const [key, value] of Object.entries(curves)){" + eol
     js += "          if (key == axis_ids['position']){" + eol
-    js += "            for (key2 in lseq){" + eol
+    js += "            for (let key2 in lseq){" + eol
     js += "              lseq[key2][sequence] = {" + eol
     js += "                'position':curves[axis_ids['position']]," + eol
     js += "                'function':curves[axis_ids['function']]" + eol
@@ -779,7 +780,10 @@ class SimtoolBuilder():
     js += "    'frames': cframes," + eol
     js += "    'config': {'displayModeBar': true, 'responsive': 'true'}" + eol        
     js += "  });" + eol
-    js += "  window.dispatchEvent(new Event('resize'));" + eol
+    #js += "  window.dispatchEvent(new Event('resize'));" 
+    js += "  window.dispatchEvent(new Event('relayout'));" 
+    
+    
     js += "}" + eol
     component.addPropVariable("loadSequence", {"type":"func", "defaultValue": js})    
     

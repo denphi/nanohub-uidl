@@ -376,7 +376,7 @@ class TeleportComponent():
           v = str(json.dumps(v)) 
       react += "'" + str(k) + "' : " + v + ", \n"
     react += "};\n"
-    react += "}; \n"
+    react += "} \n"
     react += "componentDidMount(){\n"
     react += "  let self=this;\n"
     react += "  if (this.props.onLoad){\n"
@@ -620,7 +620,7 @@ class TeleportContent():
     react = ""
     elementType = self.buildElementType()
     react += "React.createElement("+elementType+", {key:" + kwargs.get("nativeRef","") + "'" + str(self.ref) + "'"
-    sep = " ,"
+    sep = ","
     for attr, value in self.attrs.items():
       v = value
       if isinstance(value,dict):
@@ -685,9 +685,9 @@ class TeleportContent():
         for child in self.children:
           react += sep + child.buildReact(nativeRef=kwargs.get("nativeRef",""))
           sep = " ,"
-        react += "])\n"
+        react += "])"
     else:
-      react += ")\n"
+      react += ")"
     
     return react
 

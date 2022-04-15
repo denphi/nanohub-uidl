@@ -22,13 +22,13 @@ class FormHelper():
     number.content.style = { 'margin': '10px 0px 10px 0px'}
     number.content.events["blur"] = []
     
-    if kwargs.get("onChange", None) is not None:
-        number.content.events["blur"].append(kwargs.get("onChange", None))
     number.content.events["blur"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value"
     })
+    if kwargs.get("onChange", None) is not None:
+        number.content.events["blur"].append(kwargs.get("onChange", None))
     number.content.attrs["value"] = {
       "type": "dynamic",
       "content": {
@@ -38,6 +38,36 @@ class FormHelper():
     }
     return number
 
+  def NumberAsString(component, label, description, state, value=0, suffix="",*args, **kwargs):
+    if (state not in component.stateDefinitions):
+      component.addStateVariable(state, {"type":"string", "defaultValue": value})
+    number = TeleportElement(TeleportContent(elementType="FormatCustomNumber"))
+    variant = kwargs.get("variant", "outlined")
+    number.content.attrs["variant"] = variant
+    number.content.attrs["label"] = label
+    number.content.attrs["fullWidth"] = True
+    number.content.attrs["helperText"] = description
+    number.content.attrs["suffix"] = suffix
+    if (kwargs.get("decimalScale", None) is not None):
+        number.content.attrs["decimalscale"] = kwargs.get("decimalScale", 0)
+    number.content.style = { 'margin': '10px 0px 10px 0px'}
+    number.content.events["blur"] = []
+    number.content.events["blur"].append({
+      "type": "stateChange",
+      "modifies": state,
+      "newState": "$e.target.value + '"+ suffix +"'" 
+    })    
+    if kwargs.get("onChange", None) is not None:
+        number.content.events["blur"].append(kwargs.get("onChange", None))
+    
+    number.content.attrs["value"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": state
+      }  
+    }
+    return number
 
   def StringListAsString(component, label, description, state, value, *args, **kwargs):
     if isinstance(value, list): 
@@ -52,14 +82,14 @@ class FormHelper():
     string.content.attrs["helperText"] = description
     string.content.style = { 'margin': '10px 0px 10px 0px' }
     string.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-      string.content.events["change"].append(kwargs.get("onChange", None))
-        
     string.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value.split(',')"
     })
+    if kwargs.get("onChange", None) is not None:
+      string.content.events["change"].append(kwargs.get("onChange", None))
+        
 
     string.content.attrs["value"] = {
       "type": "dynamic",
@@ -83,14 +113,13 @@ class FormHelper():
     string.content.attrs["helperText"] = description
     string.content.style = { 'margin': '10px 0px 10px 0px' }
     string.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        string.content.events["change"].append(kwargs.get("onChange", None))
-        
     string.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value.split(',').map(x => Number.isInteger(Number(x)) ? Number(x).toFixed(1) : Number(x))"
     })
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
 
     string.content.attrs["value"] = {
       "type": "dynamic",
@@ -114,14 +143,13 @@ class FormHelper():
     string.content.attrs["helperText"] = description
     string.content.style = { 'margin': '10px 0px 10px 0px' }
     string.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        string.content.events["change"].append(kwargs.get("onChange", None))
-        
     string.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value.split(',').map(x => parseInt(Number(x)))"
     })
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))        
 
     string.content.attrs["value"] = {
       "type": "dynamic",
@@ -160,14 +188,14 @@ class FormHelper():
     string.content.attrs["helperText"] = description
     string.content.style = { 'margin': '10px 0px 10px 0px' }
     string.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        string.content.events["change"].append(kwargs.get("onChange", None))
         
     string.content.events["change"].append({
       "type": "stateChange",
       "modifies": "_" + state,
       "newState": "$(e.target.value)"
     })
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
 
     string.content.events["change"].append({
       "type": "stateChange",
@@ -341,13 +369,14 @@ class FormHelper():
     FormHelperText.addContent(TeleportStatic(content=description))
 
     switch.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        switch.content.events["change"].append(kwargs.get("onChange", None))
     switch.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.checked"
     })
+    if kwargs.get("onChange", None) is not None:
+        switch.content.events["change"].append(kwargs.get("onChange", None))
+
     switch.content.attrs["checked"] = {
       "type": "dynamic",
       "content": {
@@ -397,7 +426,7 @@ class FormHelper():
   def Select(component, label, description, state, value, options,*args, **kwargs):
     if (state not in component.stateDefinitions):  
       component.addStateVariable(state, {"type":"string", "defaultValue": value})
-    select = TeleportElement(MaterialContent(elementType="TextField"))
+    select = TeleportElement(MaterialContent(elementType="Select"))
     variant = kwargs.get("variant", "outlined")
     select.content.attrs["variant"] = variant
     select.content.attrs["label"] = label
@@ -406,14 +435,14 @@ class FormHelper():
     select.content.attrs["helperText"] = description
     select.content.style = { 'margin': '10px 0px 10px 0px' }
     select.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        select.content.events["change"].append(kwargs.get("onChange", None))
-        
+
     select.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value"
     })
+    if kwargs.get("onChange", None) is not None:
+        select.content.events["change"].append(kwargs.get("onChange", None))
 
     select.content.attrs["value"] = {
       "type": "dynamic",
@@ -422,6 +451,7 @@ class FormHelper():
         "id": state
       }  
     }
+    
     for key,value in options.items():
       option = TeleportElement(MaterialContent(elementType="MenuItem"))
       option.content.attrs["key"] = key
@@ -467,11 +497,14 @@ class FormHelper():
         "id": state+"_options"
       }    
     }
-    ButtonListMaterial.content.events["change"]=[{
+    ButtonListMaterial.content.events["change"]=[]
+    ButtonListMaterial.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value"
-    }]
+    })
+    if kwargs.get("onChange", None) is not None:
+        ButtonListMaterial.content.events["change"].append(kwargs.get("onChange", None))
 
     Paper = TeleportElement(MaterialContent(elementType="Paper"))
     Paper.content.style = {"width":"100%", 'margin': '10px 0px 10px 0px'}
@@ -519,11 +552,15 @@ class FormHelper():
         "id": state+"_options"
       }    
     }
-    IconListMaterial.content.events["change"]=[{
+    IconListMaterial.content.events["change"]=[]
+    IconListMaterial.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value"
-    }]
+    })
+    
+    if kwargs.get("onChange", None) is not None:
+        IconListMaterial.content.events["change"].append(kwargs.get("onChange", None))
 
     Paper = TeleportElement(MaterialContent(elementType="Paper"))
     Paper.content.style = {"width":"100%", 'margin': '10px 0px 10px 0px'}
@@ -547,14 +584,13 @@ class FormHelper():
     string.content.attrs["helperText"] = description
     string.content.style = { 'margin': '10px 0px 10px 0px' }
     string.content.events["change"] = []
-    if kwargs.get("onChange", None) is not None:
-        string.content.events["change"].append(kwargs.get("onChange", None))
-        
     string.content.events["change"].append({
       "type": "stateChange",
       "modifies": state,
       "newState": "$e.target.value"
     })
+    if kwargs.get("onChange", None) is not None:
+        string.content.events["change"].append(kwargs.get("onChange", None))
 
     string.content.attrs["value"] = {
       "type": "dynamic",
@@ -894,7 +930,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }
                 )
             if v["type"] == "ButtonList":
@@ -908,7 +944,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }
                 )
             if v["type"] == "Select":
@@ -922,7 +958,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }
                 )
             elif v["type"] == "IntegerAsString":
@@ -937,12 +973,12 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value + '" + v["units"] +"'}"]
                   }
                 )
                 if "min" in v and "max" in v and v['min'] is not None and v['max'] is not None:
                     param.content.attrs["range"] = [v['min'], v['max']]
-                
+
             elif v["type"] == "Integer":
                 param = FormHelper.Number( 
                   NComponent,
@@ -955,7 +991,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }
                 )
                 if "min" in v and "max" in v and v['min'] is not None and v['max'] is not None:
@@ -972,7 +1008,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
                 if "min" in v and "max" in v and v['min'] is not None and v['max'] is not None:
@@ -989,7 +1025,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value + '" + v["units"] +"'}"]
                   }      
                 )
                 if "min" in v and "max" in v and v['min'] is not None and v['max'] is not None:
@@ -1005,7 +1041,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
             elif v["type"] == "Boolean":
@@ -1018,7 +1054,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.checked}"]
+                    "args": ["{'" + k + "':e.target.checked}"]
                   }      
                 )
             elif v["type"] == "IntSwitch":
@@ -1032,7 +1068,7 @@ class AppBuilder():
                   onChange = {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.checked}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }
                 )
             elif v["type"] == "DictionaryAsString":
@@ -1045,7 +1081,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
             elif v["type"] == "StringListAsString":
@@ -1058,7 +1094,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
             elif v["type"] == "NumberListAsString":
@@ -1071,7 +1107,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
             elif v["type"] == "IntListAsString":
@@ -1084,7 +1120,7 @@ class AppBuilder():
                   onChange =  {
                     "type": "propCall2",
                     "calls": "onChange",
-                    "args": ["{'id':'" + k + "', 'value':e.target.value}"]
+                    "args": ["{'" + k + "':e.target.value}"]
                   }      
                 )
 
@@ -1145,6 +1181,15 @@ class AppBuilder():
       }    
     }
     tp.components["AppSettingsComponent"] = NComponent
+    
+    AppSettings.content.events["submit"] = [
+        { "type": "stateChange", "modifies": "parameters","newState": '$e.target.value'}
+    ]
+
+    AppSettings.content.events["onChange"] = [
+        { "type": "stateChange", "modifies": "parameters","newState": '${...self.state.parameters, ...e}'}
+    ]
+    
     return AppSettings
 
 

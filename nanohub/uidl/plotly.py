@@ -41,11 +41,18 @@ class PlotlyBuilder():
       "width": "100%",
     }
 
+    PlotlyPlot.content.events["onPurge"] = [{
+      "type": "propCall2",
+      "calls": "handlePurge",
+      "args": ['self', 'e.layout.scene']
+    }]
+
     BasePlotlyComponent = TeleportComponent("BasePlotlyComponent", PlotlyPlot)
     BasePlotlyComponent.addPropVariable("data", {"type":"array", "defaultValue": [{'x': [], 'y': []}]})    
     BasePlotlyComponent.addPropVariable("layout", {"type":"object", "defaultValue": {}})
     BasePlotlyComponent.addPropVariable("frames", {"type":"array", "defaultValue": []})     
     BasePlotlyComponent.addPropVariable("config", {"type":"object", "defaultValue": {}})     
+    BasePlotlyComponent.addPropVariable("handlePurge", {"type":"func", "defaultValue": "(e)=>{console.log(e);}"})  
 
     return BasePlotlyComponent    
   

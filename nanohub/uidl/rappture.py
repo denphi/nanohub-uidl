@@ -259,7 +259,7 @@ class RapptureBuilder():
     js += "  var driver_str  = '<?xml version=\"1.0\"?>\\n' + new XMLSerializer().serializeToString(xmlDoc.documentElement);" + eol
     js += "  var driver_json = {'app': '" + toolname + "', 'xml': driver_str}" + eol;
     js += "  var nanohub_token = " + store_name + ".getItem('nanohub_token');" + eol
-    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token}" + eol;
+    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token, 'Content-Type': 'application/x-www-form-urlencoded'}" + eol;
     js += "  var url = '" + url + "/run';";
     js += "  var str = [];" + eol
     js += "  for(var p in driver_json){" + eol
@@ -304,7 +304,7 @@ class RapptureBuilder():
     js += "  }" + eol;
     js += "  var session_json = {'session_num': session_id};" + eol;
     js += "  var nanohub_token = " + store_name + ".getItem('nanohub_token');" + eol
-    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token}" + eol;
+    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token, 'Content-Type': 'application/x-www-form-urlencoded'}" + eol;
     js += "  var url = '" + url + "/status';" + eol
     js += "  var str = [];" + eol
     js += "  for(var p in session_json){" + eol
@@ -359,7 +359,7 @@ class RapptureBuilder():
     js = "(self, session_id, run_file)=> {" + eol
     js += "  var results_json = {'session_num': session_id, 'run_file': run_file};" + eol;
     js += "  var nanohub_token = " + store_name + ".getItem('nanohub_token');" + eol
-    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token}" + eol;
+    js += "  var header_token = {'Authorization': 'Bearer ' + nanohub_token, 'Content-Type': 'application/x-www-form-urlencoded'}" + eol;
     js += "  self.props.onStatusChange({'target':{ 'value' : 'Loading results data' } } );" + eol
     js += "  var url = '" + url + "/output';" + eol
     js += "  var str = [];" + eol
@@ -561,8 +561,8 @@ class RapptureBuilder():
     js += "      var obj = rapp_component[j];" + eol
     js += "      var xy = obj.trim().replace(/--/g, '').replace(/\\n|\\r/g,' ').split(/[\s]+/);" + eol
     js += "      xy = xy.filter(function(el){ return el != '' });" + eol    
-    js += "      xx = xy.filter(function(el, index){ return index%2 == 0 }).map(Number);" + eol    
-    js += "      yy = xy.filter(function(el, index){ return index%2 == 1 }).map(Number);" + eol        
+    js += "      let xx = xy.filter(function(el, index){ return index%2 == 0 }).map(Number);" + eol    
+    js += "      let yy = xy.filter(function(el, index){ return index%2 == 1 }).map(Number);" + eol        
     js += "      var trace1 = {" + eol
     js += "        'type' : 'scatter'," + eol
     js += "        'x' : xx," + eol
@@ -823,7 +823,7 @@ class RapptureBuilder():
     js += "      lseq.push(sequence);" + eol
     js += "    }" + eol
     js += "  }" + eol
-    js += "  plt = component.props.plotXY(component, lseq);" + eol
+    js += "  var plt = component.props.plotXY(component, lseq);" + eol
     js += "  plt['layout']['showlegend'] = true" + eol        
     js += "  if (layout){" + eol    
     js += "    if (layout.showlegend !== undefined){" + eol
@@ -888,8 +888,8 @@ class RapptureBuilder():
     js += "      lbase.push(sequence);" + eol
     js += "    }" + eol
     js += "  }" + eol
-    js += "  pltb = component.props.plotXY(component, lbase);" + eol
-    js += "  plt = component.props.plotXY(component, lseq);" + eol
+    js += "  let pltb = component.props.plotXY(component, lbase);" + eol
+    js += "  let plt = component.props.plotXY(component, lseq);" + eol
     js += "  pltb['data'].forEach((v, i, a) => { a[i]['xaxis'] ='x'; if(a[i]['line']['color']=='yellow'){a[i]['line']['color'] = '#984ea3';} });" + eol
     js += "  plt['data'].forEach((v, i, a) => { a[i]['xaxis'] ='x2'; if(a[i]['line']['color']=='yellow'){a[i]['line']['color'] = '#984ea3';}});" + eol
     js += "  plt['layout']['showlegend'] = true" + eol    
@@ -1776,9 +1776,9 @@ class RapptureBuilder():
     js += "      }" + eol
     js += "    });" + eol
     js += "  } else { " + eol
-    js += "    vtk = molecule.querySelectorAll('vtk')" + eol
+    js += "    let vtk = molecule.querySelectorAll('vtk')" + eol
     js += "    if (vtk.length>0){" + eol
-    js += "      vtkt = component.props.getText(component, vtk[0], []);" + eol
+    js += "      let vtkt = component.props.getText(component, vtk[0], []);" + eol
     js += "      var lines = vtkt.split('\\n');" + eol
     js += "      var i=0;" + eol
     js += "      var points = [];" + eol
@@ -1786,11 +1786,11 @@ class RapptureBuilder():
     js += "      while (i < lines.length){" + eol
     js += "        var line = lines[i];" + eol
     js += "        if (line.startsWith('POINTS')){" + eol
-    js += "          tpoints = parseInt(line.split(/[\s]+/)[1]);" + eol
+    js += "          let tpoints = parseInt(line.split(/[\s]+/)[1]);" + eol
     js += "          for (var ii=0; ii<Math.ceil(tpoints/3);ii++){" + eol
     js += "            var i = i+1;" + eol
     js += "            line = lines[i];" + eol
-    js += "            var pp = line.split(/[\s]+/);" + eol
+    js += "            let pp = line.split(/[\s]+/);" + eol
     js += "            if (points.length < tpoints) {" + eol
     js += "              points.push([parseFloat(pp[0]),parseFloat(pp[1]),parseFloat(pp[2])])" + eol
     js += "            } if (points.length < tpoints) {" + eol
@@ -1804,7 +1804,7 @@ class RapptureBuilder():
     js += "          for (var ii=0; ii<tvert; ii++){" + eol
     js += "            i = i+1;" + eol  
     js += "            line = lines[i];" + eol
-    js += "            pp = line.split(/[\s]+/);" + eol
+    js += "            let pp = line.split(/[\s]+/);" + eol
     js += "            pp = pp.map((p)=>{return parseInt(p)});" + eol
     js += "            atoms[pp[1]] = [points[ii][0],points[ii][1],points[ii][2], 'Si', 'rgb(240,200,160)', 'enabled'];" + eol
     js += "          }" + eol
@@ -1815,11 +1815,11 @@ class RapptureBuilder():
     js += "            }" + eol
     js += "          }" + eol
     js += "        } else if (line.startsWith('LINES')){" + eol
-    js += "          tlines = parseInt(line.split(/[\s]+/)[1])" + eol
+    js += "          let tlines = parseInt(line.split(/[\s]+/)[1])" + eol
     js += "          for (var ii=0; ii<tlines; ii++){" + eol
     js += "            i = i+1" + eol             
     js += "            line = lines[i]" + eol
-    js += "            pp = line.split(/[\s]+/)" + eol
+    js += "            let pp = line.split(/[\s]+/)" + eol
     js += "            pp = pp.map((p)=>{return parseInt(p)});" + eol
     js += "            if (pp[1] in connections){" + eol
     js += "              connections[pp[1]].push(pp[2]);" + eol
@@ -1828,14 +1828,14 @@ class RapptureBuilder():
     js += "            }" + eol
     js += "          }" + eol
     js += "        } else if (line.startsWith('atom_type')){" + eol
-    js += "          ttype = parseInt(line.split(/[\s]+/)[2]);" + eol
+    js += "          let ttype = parseInt(line.split(/[\s]+/)[2]);" + eol
     js += "          for (var ii=0; ii<Math.ceil(ttype/9);ii++) {" + eol
     js += "            i = i+1;" + eol 
     js += "            line = lines[i];" + eol
-    js += "            pp = line.split(/[\s]+/);" + eol
+    js += "            let pp = line.split(/[\s]+/);" + eol
     js += "            pp = pp.map((p)=>{return parseInt(p)});" + eol
     js += "            for (var k=0; k<9; k++){" + eol
-    js += "              atom_id = (9*ii+k);" + eol
+    js += "              let atom_id = (9*ii+k);" + eol
     js += "              if (atom_id in atoms && component.props.getColor(component, pp[k])){" + eol
     js += "                atoms[atom_id][3] = component.props.getAtomName(component, pp[k]);" + eol
     js += "                atoms[atom_id][4] = component.props.getColor(component, pp[k]);" + eol
