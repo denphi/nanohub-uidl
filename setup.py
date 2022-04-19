@@ -72,6 +72,9 @@ setup_args = {
         ],
     },
     'entry_points' : {
+        'console_scripts': [
+            'run_uidl = nanohub.uidl:main'
+        ],
     },
 }
 

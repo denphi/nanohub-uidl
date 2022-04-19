@@ -12,3 +12,6 @@ build
 nanohub/remote
 examples/tools/__TMPReact*
 examples/tools/secrets.py
+.ipynb_checkpoints/
+*.html
+
