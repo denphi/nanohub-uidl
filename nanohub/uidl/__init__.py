@@ -179,7 +179,10 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
             path = urllib.parse.unquote(path)
         path = posixpath.normpath(path)
         words = path.split('/')
-        words = words[len(UIDLRequestHandler.path.split('/')):]
+        if words[1] == "weber":
+            words = words[5:]
+        else:
+            words = words[1:]
         words = [w for w in words if w is not None]
         path = "/".join(words)
         if trailing_slash:
@@ -206,8 +209,7 @@ def parse_cmd_line():
             cookie = line.split()[1]
         elif line.startswith('filexfer_port'):
             cookieport = line.split()[1]  
-    #path = "/weber/" + str(sessionid) + "/" + cookie + "/" + str(int(cookieport)%1000) + "/"
-    path = "/"
+    path = "/weber/" + str(sessionid) + "/" + cookie + "/" + str(int(cookieport)%1000) + "/"
     parser = argparse.ArgumentParser(
         usage="""usage: [-h] [--host] [--port] [--hub] [--session] [--app] [--token] [name]
 Start a Jupyter notebook-based tool
