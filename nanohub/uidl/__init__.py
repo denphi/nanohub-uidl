@@ -179,7 +179,7 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
             path = urllib.parse.unquote(path)
         path = posixpath.normpath(path)
         words = path.split('/')
-        words = words[5:]
+        words = words[len(UIDLRequestHandler.path.split('/')):]
         words = [w for w in words if w is not None]
         path = "/".join(words)
         if trailing_slash:
@@ -206,7 +206,8 @@ def parse_cmd_line():
             cookie = line.split()[1]
         elif line.startswith('filexfer_port'):
             cookieport = line.split()[1]  
-    path = "/weber/" + str(sessionid) + "/" + cookie + "/" + str(int(cookieport)%1000) + "/"
+    #path = "/weber/" + str(sessionid) + "/" + cookie + "/" + str(int(cookieport)%1000) + "/"
+    path = "/"
     parser = argparse.ArgumentParser(
         usage="""usage: [-h] [--host] [--port] [--hub] [--session] [--app] [--token] [name]
 Start a Jupyter notebook-based tool
@@ -225,7 +226,7 @@ optional arguments:
         add_help=False)
     parser.add_argument('-h', '--help', dest='help', action='store_true')
     parser.add_argument('-o', '--host', dest='host', action='store', default='0.0.0.0')
-    parser.add_argument('-p', '--port', dest='port', type=int, action='store', default=8000)
+    parser.add_argument('-p', '--port', dest='port', type=int, action='store', default=8001)
     parser.add_argument('-b', '--hub', dest='hub_url', action='store', default=hub_url)
     parser.add_argument('-s', '--session', dest='session', type=int, action='store', default=sessionid)
     parser.add_argument('-a', '--app', dest='app', action='store', default=app)
