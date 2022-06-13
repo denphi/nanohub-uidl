@@ -127,8 +127,6 @@ class SimtoolBuilder():
     SimtoolBuilder.buildSchema(tp, Component, *args, **kwargs)
     store_name="sessionStore";
     NanohubUtils.storageFactory(tp, store_name=store_name, storage_name="window.sessionStorage") 
-    local_storage = "LocalStore"
-    NanohubUtils.storageFactory(tp, store_name=local_storage, storage_name="NativeStorage")
     use_cache = kwargs.get("use_cache", True) 
     outputs = kwargs.get("outputs", []) 
     if (use_cache):
@@ -147,7 +145,6 @@ class SimtoolBuilder():
 
     js = "async (self, ostate)=>{" + eol
     js += "  var state = self.state;" + eol
-    #js += "  " + local_storage + ".removeItem('output_json');" + eol
     
     if (use_cache):
       js += "  self.props.onStatusChange({'target':{ 'value' : 'Checking Cache' } } );" + eol
@@ -240,7 +237,6 @@ class SimtoolBuilder():
     if (use_cache):    
       js += "  } else { " + eol
       js += "    self.props.onStatusChange({'target':{ 'value' : 'Loading from local Cache' } } );" + eol
-      #js += "    " + local_storage + ".setItem('output_json', hash_q);" + eol
       js += "    self.props.onSuccess(self, hash_key)" + eol        
       js += "  }" + eol
     js += "}"
@@ -664,6 +660,90 @@ class SimtoolBuilder():
     return {
       "type": "propCall2",
       "calls": "loadDefaultSimulation",
+      "args": ['e', 'self']
+    }
+
+  def downloadOutput(tp, component, *args, **kwargs):
+    toolname = kwargs.get("toolname", "")
+    revision = kwargs.get("revision", "")
+    url = kwargs.get("url", "")
+    store_name="sessionStore";
+    NanohubUtils.storageFactory(tp, store_name=store_name)
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    if kwargs.get('jupyter_cache', None) is not None:
+      cache_storage = kwargs.get("cache_storage", "cacheFactory('"+cache_store+"', 'JUPYTERSTORAGE')") 
+      NanohubUtils.storageFactory(tp, method_name='storageJupyterFactory', jupyter_cache=kwargs.get('jupyter_cache', None), store_name=cache_store, storage_name=cache_storage)
+    else:
+      cache_storage = kwargs.get("cache_storage", "cacheFactory('"+cache_store+"', 'INDEXEDDB')")
+      NanohubUtils.storageFactory(tp, store_name=cache_store, storage_name=cache_storage)    
+        
+    eol = "\n";
+    js = ""
+    js += "async (self, component) => {" + eol
+    js += "  var olist_json = await " + cache_store + ".getItem('cache_list');" + eol
+    js += "  if (!olist_json || olist_json == '')" + eol
+    js += "    olist_json = '{}';" + eol
+    js += "  let inputs = JSON.parse(olist_json);" + eol
+    js += "  for (const input in inputs) {" + eol
+    js += "    let data = {" + eol
+    js += "      'name': '" + toolname + "', " + eol
+    js += "      'revision': '" + str(revision) + "', " + eol
+    js += "      'inputs': inputs[input], " + eol
+    js += "      'outputs' : [component]," + eol
+    js += "      'cores' : inputs[input]['cores']," + eol
+    js += "      'cutoff' : inputs[input]['cutoff']," + eol
+    js += "      'venue' : inputs[input]['venue']" + eol
+    js += "    }" + eol;
+    js += "    var nanohub_token = " + store_name + ".getItem('nanohub_token');" + eol
+    js += "    var header_token = {'Authorization': 'Bearer ' + nanohub_token}" + eol;
+    js += "    var url = '" + url + "/run';" + eol 
+    js += "    var options = { 'handleAs' : 'json' , 'headers' : header_token, 'method' : 'POST', 'data' : data };" + eol  
+    js += "    try{" + eol    
+    js += "      Axios.request(url, options)" + eol    
+    js += "      .then(function(response){" + eol
+    js += "        var data = response.data;" + eol
+    #js += "        console.log(data);" + eol
+    js += "        if(data.code){" + eol    
+    js += "          if(data.message){" + eol    
+    #js += "            self.props.onError( '(' + data.code + ') ' +data.message );" + eol
+    js += "          } else {" + eol    
+    #js += "            self.props.onError( '(' + data.code + ') Error sending the simulation' );" + eol
+    js += "          } " + eol    
+    js += "        }else{" + eol    
+    js += "          if(data.id){" + eol 
+    js += "            if('outputs' in data){" + eol
+    #js += "              self.props.onLoad(self);" + eol #TODO create window + display Data  
+    js += "            } else {" + eol
+    js += "              setTimeout(function(){ self.props.downloadOutput(self, data.id, 10) }, 5000);" + eol
+    js += "            }" + eol
+    js += "          } else {" + eol    
+    #js += "            self.props.onError( 'Error submiting the simulation, session not found' );" + eol
+    js += "          }" + eol    
+    js += "        }" + eol    
+    js += "      }).catch(function(error){" + eol     
+    js += "        if (error.response){" + eol 
+    js += "          if (error.response.data){" + eol 
+    js += "            if (error.response.data.message){" + eol 
+    #js += "              self.props.onError(String(error.response.data.message));" + eol 
+    js += "            } else {" + eol 
+    #js += "              self.props.onError(String(error.response.data));" + eol 
+    js += "            }" + eol 
+    js += "          } else {" + eol 
+    #js += "            self.props.onError(String(error.response));" + eol      
+    js += "          }" + eol 
+    js += "        } else {" + eol 
+    #js += "          self.props.onError(String(error));" + eol 
+    js += "        }" + eol 
+    js += "      });" + eol 
+    js += "    } catch (err) {" + eol 
+    #js += "      self.props.onError(String(err));" + eol      
+    js += "    }" + eol 
+    js += "  }" + eol 
+    js += "}" + eol
+    component.addPropVariable("downloadOutput", {"type":"func", "defaultValue": js})    
+    return {
+      "type": "propCall2",
+      "calls": "downloadOutput",
       "args": ['e', 'self']
     }
 

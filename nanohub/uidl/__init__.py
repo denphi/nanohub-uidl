@@ -90,7 +90,8 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
             text = text.replace("url = '" + UIDLRequestHandler.hub_url + "/api/", "url = '" + UIDLRequestHandler.path + "api/")
             
             
-            ticket =  UIDLRequestHandler.hub_url + '/feedback/report_problems?group=app-' + UIDLRequestHandler.app
+            ticket =  UIDLRequestHandler.hub_url + '/feedback/report_problems?group=app-' + UIDLRequestHandler.app.replace('\"', '').replace(' ','_')
+
             header = '<div style="position: fixed;z-index: 1000000;top: 0px;right: 170px;"><button title="Report a problem" onclick="window.open(\'' + ticket + '\')" style="color: #333;padding: 7px 15px;border: 0px;">Submit a ticket</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\'' + close + '\'" style="color: #333;padding: 7px 15px;border: 0px;">Terminate Session</button></div>'
             res = re.search("<body(?:\"[^\"]*\"['\"]*|'[^']*'['\"]*|[^'\">])+>", text)
             if res is not None:
@@ -202,7 +203,7 @@ def parse_cmd_line():
         elif line.startswith('sessionid'):
             sessionid = int(line.split()[1])
         elif line.startswith('application_name'):
-            app = line.split()[1]
+            app = line.split(" ", 1)[1]
         elif line.startswith('session_token'):
             token = line.split()[1]    
         elif line.startswith('filexfer_cookie'):
@@ -246,10 +247,10 @@ def main():
     
     parser = parse_cmd_line()
     args = parser.parse_args()
+
     if args.help:
         pass
     else:
-            
         os.environ['DISPLAY'] = ""
         socketserver.TCPServer.allow_reuse_address = True
         UIDLRequestHandler.filename = args.dir + "/" + args.name
@@ -260,6 +261,7 @@ def main():
         UIDLRequestHandler.path = args.path
         with socketserver.TCPServer((args.host, args.port), UIDLRequestHandler) as httpd:
             print("Nanohub UIDL Server started at port", args.port, "using filename", args.name)
+            print("Server running on " + args.hub_url.replace("://","://proxy.")  + args.path)    
             try:
                 # Run the web server
                 httpd.serve_forever()

@@ -1133,6 +1133,7 @@ class AppBuilder():
         runSimulation = RapptureBuilder.onSimulate(
           tp,
           NComponent,
+          cache_store = kwargs.get("cache_store", "CacheStore"),
           toolname=kwargs.get("toolname", ""),
           url=kwargs.get("url", None),
           jupyter_cache=kwargs.get("jupyter_cache", None),
@@ -1141,6 +1142,7 @@ class AppBuilder():
         runSimulation = SimtoolBuilder.onSimulate(
           tp,
           NComponent,
+          cache_store = kwargs.get("cache_store", "CacheStore"),
           toolname=kwargs.get("toolname", ""),
           revision=kwargs.get("revision", ""),
           url=kwargs.get("url", None),

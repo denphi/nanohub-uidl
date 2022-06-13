@@ -131,11 +131,9 @@ class RapptureBuilder():
   def onSimulate(tp, Component, *args, **kwargs):
     store_name="sessionStore";
     NanohubUtils.storageFactory(tp, store_name=store_name, storage_name="window.sessionStorage") 
-    local_storage = "LocalStore"
-    NanohubUtils.storageFactory(tp, store_name=local_storage, storage_name="NativeStorage")
     use_cache = kwargs.get("use_cache", True) #TODO False by default 
+    cache_store = kwargs.get("cache_store", "CacheStore");
     if (use_cache):
-      cache_store = kwargs.get("cache_store", "CacheStore");
       if kwargs.get('jupyter_cache', None) is not None:
         cache_storage = kwargs.get("cache_storage", "cacheFactory('"+cache_store+"', 'JUPYTERSTORAGE')") 
         NanohubUtils.storageFactory(tp, method_name='storageJupyterFactory', jupyter_cache=kwargs.get('jupyter_cache', None), store_name=cache_store, storage_name=cache_storage)
@@ -149,7 +147,7 @@ class RapptureBuilder():
 
     js = "async (self, ostate)=>{" + eol
     js += "  var state = self.state;" + eol
-    js += "  " + local_storage + ".removeItem('output_xml');" + eol
+    js += "  " + cache_store + ".removeItem('output_xml');" + eol
     
     if (use_cache):
       js += "  self.props.onStatusChange({'target':{ 'value' : 'Checking Cache' } } );" + eol
@@ -291,7 +289,7 @@ class RapptureBuilder():
     if (use_cache):    
       js += "  } else { " + eol
       js += "    self.props.onStatusChange({'target':{ 'value' : 'Loading from local Cache' } } );" + eol
-      js += "    " + local_storage + ".setItem('output_xml', JSON.stringify(hash_q));" + eol
+      js += "    " + cache_store + ".setItem('output_xml', JSON.stringify(hash_q));" + eol
       js += "    self.props.onSuccess(self)" + eol        
       js += "  }" + eol
     js += "}"
@@ -381,7 +379,7 @@ class RapptureBuilder():
       js += "      var hashArray = Array.from(new Uint8Array(hashBuffer));" + eol
       js += "      var hash_key = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');" + eol
       js += "      var hash_q = await " + cache_store + ".setItem(hash_key, output, (e)=>{self.props.onError(e.toString())});" + eol    
-    js += "      " + local_storage + ".setItem('output_xml', JSON.stringify(output));" + eol
+    js += "      " + cache_store + ".setItem('output_xml', JSON.stringify(output));" + eol
     js += "      self.props.onSuccess(self)" + eol
     js += "    }" + eol    
     js += "  }).catch(function(error){" + eol
@@ -793,8 +791,8 @@ class RapptureBuilder():
   def loadXY(tp, component, *args, **kwargs):   
     eol = "\n";
     RapptureBuilder.plotXY(tp, component)
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
     js += "(component, seq, layout) => {" + eol
     js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
@@ -854,8 +852,8 @@ class RapptureBuilder():
   def loadXYDual(tp, component, *args, **kwargs):   
     eol = "\n";
     RapptureBuilder.plotXY(tp, component)
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
     js += "(component, base, seq, layout) => {" + eol
     js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
@@ -943,8 +941,8 @@ class RapptureBuilder():
   def loadSequence(tp, component, *args, **kwargs):   
     eol = "\n";
     RapptureBuilder.plotSequence(tp, component)
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
     js += "(component, seq) => {" + eol
     js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
@@ -1169,8 +1167,8 @@ class RapptureBuilder():
   def loadMolecule(tp, component, *args, **kwargs,):   
     eol = "\n";
     RapptureBuilder.plotDrawingPlotly(tp, component)
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
     js += "(component, seq, method, layout) => {" + eol
     js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
