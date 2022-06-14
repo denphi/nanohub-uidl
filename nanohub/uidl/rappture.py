@@ -320,8 +320,13 @@ class RapptureBuilder():
     js += "        } else {" + eol
     js += "          self.props.onStatusChange({'target':{ 'value' : 'Checking status of session ' + String(session_id) } } );" + eol
     js += "        }" + eol
-    js += "        if(status['finished']){" + eol
-    js += "          if(status['run_file'] != ''){" + eol
+    js += "        if(status['finished']){" + eol    
+    js += "          let regex = /\[status\] output saved in [a-zA-Z0-9\/].*\/(run[0-9]*\.xml)/;" + eol
+    js += "          let m;" + eol
+    js += "          if ((m = regex.exec(status['status'])) !== null) {" + eol
+    js += "              self.props.onLoad(self);" + eol
+    js += "              self.props.onLoadResults(self, session_id, m[1]);" + eol
+    js += "          } else if(status['run_file'] != ''){" + eol
     js += "            self.props.onLoad(self);" + eol      
     js += "            self.props.onLoadResults(self, session_id, status['run_file']);" + eol
     js += "          } else {" + eol
@@ -794,8 +799,8 @@ class RapptureBuilder():
     cache_store = kwargs.get("cache_store", "CacheStore");
     NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
-    js += "(component, seq, layout) => {" + eol
-    js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
+    js += "async (component, seq, layout) => {" + eol
+    js += "  var await output_xml = " + store_name + ".getItem('output_xml');" + eol
     js += "  if (!output_xml || output_xml == '')" + eol
     js += "    return;" + eol
     #js += "  console.log(output_xml);" + eol
@@ -855,8 +860,8 @@ class RapptureBuilder():
     cache_store = kwargs.get("cache_store", "CacheStore");
     NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
-    js += "(component, base, seq, layout) => {" + eol
-    js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
+    js += "async (component, base, seq, layout) => {" + eol
+    js += "  var output_xml = await " + store_name + ".getItem('output_xml');" + eol
     js += "  if (!output_xml || output_xml == '')" + eol
     js += "    return;" + eol
     #js += "  console.log(output_xml);" + eol
@@ -944,8 +949,8 @@ class RapptureBuilder():
     cache_store = kwargs.get("cache_store", "CacheStore");
     NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
-    js += "(component, seq) => {" + eol
-    js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
+    js += "async (component, seq) => {" + eol
+    js += "  var output_xml = await " + store_name + ".getItem('output_xml');" + eol
     js += "  if (!output_xml || output_xml == '')" + eol
     js += "    return;" + eol
     #js += "  console.log(output_xml);" + eol
@@ -1170,8 +1175,8 @@ class RapptureBuilder():
     cache_store = kwargs.get("cache_store", "CacheStore");
     NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
-    js += "(component, seq, method, layout) => {" + eol
-    js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
+    js += "async (component, seq, method, layout) => {" + eol
+    js += "  var output_xml = await " + cache_store + ".getItem('output_xml');" + eol
     js += "  if (!output_xml || output_xml == '')" + eol
     js += "    return;" + eol
     js += "  var xmlDoc = JSON.parse(output_xml);" + eol
@@ -1227,8 +1232,6 @@ class RapptureBuilder():
 
   def extractVectors(tp, component, *args, **kwargs):   
     eol = "\n";
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
     RapptureBuilder.getColor(tp, component)            
     js = ""
     js += "(component, seq, layout) => {" + eol
@@ -1301,11 +1304,11 @@ class RapptureBuilder():
   def loadVectors(tp, component, *args, **kwargs):   
     eol = "\n";
     RapptureBuilder.extractVectors(tp, component)
-    store_name="LocalStore";
-    NanohubUtils.storageFactory(tp, store_name=store_name)    
+    cache_store = kwargs.get("cache_store", "CacheStore");
+    NanohubUtils.storageFactory(tp, store_name=cache_store)    
     js = ""
-    js += "(component, seq, layout) => {" + eol
-    js += "  var output_xml = " + store_name + ".getItem('output_xml');" + eol
+    js += "async (component, seq, layout) => {" + eol
+    js += "  var output_xml = await " + cache_store + ".getItem('output_xml');" + eol
     js += "  if (!output_xml || output_xml == '')" + eol
     js += "    return;" + eol
     #js += "  console.log(output_xml);" + eol
