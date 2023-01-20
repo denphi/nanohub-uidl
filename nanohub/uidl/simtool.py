@@ -879,7 +879,7 @@ class SimtoolBuilder():
     NanohubUtils.storageFactory(tp, store_name=store_name)
     toolname = kwargs.get("toolname", "")
     revision = kwargs.get("revision", "")
-    url = kwargs.get("url", "https://nanohub.org/api/dbexplorer/simtools")
+    url = kwargs.get("url", "https://nanohub.org/api/results/simtools")
     eol = "\n"
     js = ""
     js += "async (self) => {"
