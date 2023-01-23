@@ -13,9 +13,9 @@ pip install nanohub-uidl
 
 
 ```python
-from nanohub.uidl.teleport import TeleportProject, TeleportElement
-from nanohub.uidl.material import MaterialContent
-from nanohub.uidl.auth import AUTH
+from nanohubuidl.teleport import TeleportProject, TeleportElement
+from nanohubuidl.material import MaterialContent
+from nanohubuidl.auth import AUTH
 
 Project = TeleportProject("My App")
 Component = Project.root
