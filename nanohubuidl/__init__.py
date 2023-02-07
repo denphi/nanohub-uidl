@@ -33,7 +33,6 @@ from .rappture import *
 
 from ._version import __version__, version_info
 
-
 import http.client
 import io
 import os
@@ -50,6 +49,267 @@ from urllib.parse import parse_qsl
 import urllib
 import re
 import argparse
+import simtool
+
+from simtool import findInstalledSimToolNotebooks, searchForSimTool
+from simtool import getSimToolInputs, getSimToolOutputs, Run
+from simtool.utils import _get_inputs_dict, _get_inputs_cache_dict, getParamsFromDictionary
+import random
+from threading import Thread
+from multiprocessing import Process, Manager
+from requests.models import Response
+
+class SubmitLocal():
+    def __init__(self, *args, jobspath=None, **kwargs):
+        if jobspath is None:
+            jobspath = os.path.join(os.getcwd(), "RUNS")
+        if not os.path.exists(jobspath):
+            os.makedirs(jobspath)
+        self.jobspath = jobspath
+        manager =  Manager()
+        self.squidmap = manager.dict()
+        for subdir, dirs, files in os.walk(jobspath):
+            for file in files:
+                if file == ".squidid":
+                    jobid = subdir.split("_", 1)
+                    if len(jobid) == 2:
+                        id = open(os.path.join(subdir, file),"r").read().strip()
+                        self.squidmap[id] = jobid[1]
+        resourcePath = os.environ['rpath_user']
+        if os.path.exists(resourcePath):
+            fpResource = open(resourcePath,'r')
+            records = fpResource.readlines()
+            for record in records:
+                if record.startswith('squiddb '):
+                    self.squiddb = record.split()[1]
+
+    def handle(self, url, data={}):
+        obj = Response()
+        if ("api/developer/oauth/token" in url):
+            obj = self.authTask(data)
+        elif "api/results/simtools/get" in url:
+            elements = url.split("/")
+            try:
+                pos = elements.index("get")
+                if (pos == len(elements) -2):
+                    obj = self.schemaTask(elements[pos+1],elements[pos+2])
+                elif (pos == len(elements) -3):
+                    obj = self.schemaTask(elements[pos+1], None)
+                else:
+                    obj._content = bytes("Not Found", "utf8")
+                    obj.status_code = 404    
+            except Exception as e:
+                obj._content = bytes(str(e), "utf8")
+                obj.status_code = 500       
+            except:
+                obj._content = bytes("Server Error", "utf8")
+                obj.status_code = 500       
+        elif "api/results/simtools/run" in url:
+            elements = url.split("/")
+            try:
+                pos = elements.index("run")
+                if (pos == len(elements) -1):
+                    obj = self.runTask(json.loads(data.decode('utf8')))
+                elif (pos == len(elements) -2):
+                    obj = self.statusTask(elements[pos+1])
+                else:
+                    obj._content = bytes("Not Found", "utf8")
+                    obj.status_code = 404    
+            except Exception as e:
+                obj._content = bytes(str(e), "utf8")
+                obj.status_code = 500       
+            except:
+                obj._content = bytes("Server Error", "utf8")
+                obj.status_code = 500       
+        else:
+            obj = Response()
+            obj._content = bytes("Not Found", "utf8")
+            obj.status_code = 404
+        return obj         
+ 
+    def schemaTask(self, tool, revision):
+        obj = Response()
+        response = {}
+        t = time.time()
+        simToolName = tool
+        simToolRevision = revision
+        simToolLocation = searchForSimTool(simToolName)
+        inputs = getSimToolInputs(simToolLocation)
+        outputs = getSimToolOutputs(simToolLocation)
+        response['inputs'] = {}
+        for k in inputs:
+            response['inputs'][k] = {}
+            for k2 in inputs[k]:
+                response['inputs'][k][k2] = str(inputs[k][k2])
+        response['outputs'] = {}
+        for k in outputs:
+            response['outputs'][k] = {}
+            for k2 in outputs[k]:
+                response['outputs'][k][k2] = str(outputs[k][k2])
+        response["message"] =  None
+        response["response_time"] =  time.time() - t
+        response["success"] =  True
+        if (simToolLocation['published']):
+            response["state"] = 'published'
+        else :
+            response["state"] = 'installed'
+        response["name"] = str(simToolLocation['simToolName'])
+        response["revision"] = str(simToolLocation['simToolRevision']).replace("r","")
+        response["path"] = simToolLocation['notebookPath']
+        response["type"] = 'simtool'
+        
+        obj.status_code = 200
+        obj._content = bytes(json.dumps({'tool':response}), "utf8")
+        return obj
+    
+    def searchJobId (self, squidid):
+        if str(squidid) in self.squidmap.keys():
+            return self.squidmap[squidid]
+        else:
+            return None
+        
+        
+    def runTask(self, request):
+        obj = Response()
+        response = {}
+        t = time.time()
+        simToolName = request["name"]
+        simToolRevision = request["revision"]
+        simToolLocation = searchForSimTool(simToolName)
+        simToolName = request["name"]
+        simToolRevision = "r"+request["revision"]
+        simToolLocation = searchForSimTool(simToolName, simToolRevision)
+        inputsSchema = getSimToolInputs(simToolLocation)
+        inputs = getParamsFromDictionary(inputsSchema,request["inputs"])
+        hashableInputs = _get_inputs_cache_dict(inputs)
+        response["userinputs"] = _get_inputs_dict(inputs)
+        ds = simtool.datastore.WSDataStore(simToolName,simToolRevision,hashableInputs,self.squiddb)
+        jobid = self.searchJobId(ds.getSimToolSquidId().replace("/r", "/"))
+        if (jobid is not None):
+            return self.statusTask(jobid)
+        else:
+            jobid = random.randint(1, 100000);
+            created = False
+            while created == False:
+                jobpath = os.path.join(self.jobspath, "_"+str(jobid))
+                if (os.path.exists(jobpath)):
+                    jobid = random.randint(1, 100000);
+                    created = False
+                else :
+                    created = True
+            thread = Process(target=SubmitLocal.runJob, args=(self, jobid, simToolLocation, inputs, request["outputs"] ))   
+            thread.start()
+            response["message"] =  ""
+            response["status"] =  "QUEUED"
+            response["id"] =  jobid
+            response["response_time"] =  time.time() - t
+            response["success"] =  True
+            obj.status_code = 200
+            obj._content = bytes(json.dumps(response), "utf8")
+            return obj
+
+
+    def runJob(self, jobid, simToolLocation, inputs, outputs):
+        try :
+            jobpath = os.path.join(self.jobspath, "_"+str(jobid))
+            with open(os.path.join(self.jobspath, '.'+str(jobid)), 'w', buffering=1) as sys.stdout:
+                with sys.stdout as sys.stderr:
+                    dictionary = {}
+                    r = Run(simToolLocation, inputs, "_"+str(jobid))
+                    for o in outputs:
+                        try:
+                            dictionary[o] = r.read(o)
+                        except:
+                            pass
+            with open(os.path.join(self.jobspath, '.'+str(jobid)), 'r') as file:
+                logs = file.read()
+                if "SimTool execution failed" in logs:
+                    with open(os.path.join(jobpath, '.error'), "w") as outfile:
+                        error = {"message" : "SimTool execution failed (" + jobpath + ")", "code" : 500}
+                        json.dump(error, outfile)
+                else:
+                    with open(os.path.join(jobpath, '.results'), "w") as outfile:
+                        json.dump(dictionary, outfile)
+                    id = open(os.path.join(jobpath, '.squidid'),"r").read().strip()
+                    self.squidmap[id] = jobid 
+
+        except Exception as e :
+            error = {"message" : e.message(), "code" : 500}
+            with open(os.path.join(jobpath, '.error'), "w") as outfile:
+                json.dump(error, outfile)
+        except :
+            error = {"message" : "Server Error", "code":500}
+            with open(os.path.join(jobpath, '.error'), "w") as outfile:
+                json.dump(error, outfile)
+        return
+        
+    def statusTask(self, jobid):
+        obj = Response()
+        obj.status_code = 200
+        try :
+            response = {}
+            response["id"] =  jobid
+            t = time.time()
+            jobpath = os.path.join(self.jobspath, "_"+str(jobid))
+            if (os.path.exists(jobpath)):
+                response["status"] =  "RUNNING"
+                error = os.path.join(jobpath, '.error')
+                if (os.path.isfile(error)):
+                    er = json.load(open(error,))
+                    response["message"] = er["message"]
+                    response["status"] = "ERROR"
+                    obj.status_code = er["code"]
+                else :
+                    results = os.path.join(jobpath, '.results')
+                    if (os.path.isfile(results)):
+                        out = json.load(open(results,"r"))
+                        out['_id_'] = open(os.path.join(jobpath, '.squidid'),"r").read()
+                        response["message"] = None
+                        response["outputs"] = out
+                        response["status"] =  "INDEXED"
+                    else:
+                        with open(os.path.join(self.jobspath, '.'+str(jobid)),"r") as log:
+                            logs = log.read()
+                            logs = logs.split("\n")
+                            if (len(logs)>1):
+                                response["message"] = logs[len(logs)-2]
+                                response["status"] = logs[len(logs)-2]
+            else :
+                response["message"] = ""
+                response["status"] =  "NOT FOUND"
+                obj.status_code = 404
+
+            response["response_time"] =  time.time() - t
+            response["success"] = True
+            obj._content = bytes(json.dumps(response), "utf8")
+        except Exception as e :
+            obj.status_code = 500
+            obj._content = bytes(str(e), "utf8")
+        except:
+            obj.status_code = 500
+            obj._content = bytes("Unknown", "utf8")
+        return obj  
+    
+    def authTask(self, request):
+        obj = Response()
+        obj.status_code = 200
+        try :
+            response = {
+                "access_token" : "session"+os.environ['sessionid'],
+                "expires_in":3600,
+                "token_type":"Bearer",
+                "scope":None
+            }
+            obj._content = bytes(json.dumps(response), "utf8")
+        except Exception as e :
+            obj.status_code = 500
+            obj._content = bytes(str(e), "utf8")
+        except:
+            obj.status_code = 500
+            obj._content = bytes("Unknown", "utf8")
+
+        return obj  
+
 
 class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
 
@@ -59,7 +319,9 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
     app = ""
     token = ""
     path = ""
-    
+    local = False
+    submit = SubmitLocal()
+
     def __init__(self, *args, directory=None, **kwargs):
         if directory is None:
             directory = os.getcwd()
@@ -70,41 +332,48 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
         path = self.translate_path(self.path)
         status = HTTPStatus.OK
 
-        close =  UIDLRequestHandler.hub_url + '/tools/anonymous/stop?sess=' + UIDLRequestHandler.session
+        close = UIDLRequestHandler.hub_url + \
+            '/tools/anonymous/stop?sess=' + UIDLRequestHandler.session
         text = '''<!DOCTYPE html>
             <html>
                 <body>
-                    <p>''' + path +''' Not Found</p>
-                    <p>''' + UIDLRequestHandler.filename +''' Not Found</p>
+                    <p>''' + path + ''' Not Found</p>
+                    <p>''' + UIDLRequestHandler.filename + ''' Not Found</p>
                     <div style="position: fixed;z-index: 1000000;top: 0px;right: 170px;"><button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\'''' + close + '''\'" style="color: #333;padding: 7px 15px;border: 0px;">Terminate Session</button></div>
                 </body>
             </html>'''
 
         if os.path.exists(UIDLRequestHandler.filename) is False:
             status = HTTPStatus(404)
-        
-        elif path in ["", "/", "index.htm", "index.html", UIDLRequestHandler.filename ] :
+
+        elif path in ["", "/", "index.htm", "index.html", UIDLRequestHandler.filename]:
             with open(UIDLRequestHandler.filename) as file:
                 text = file.read()
-                
-            text = text.replace("url = '" + UIDLRequestHandler.hub_url + "/api/", "url = '" + UIDLRequestHandler.path + "api/")
-            
-            
-            ticket =  UIDLRequestHandler.hub_url + '/feedback/report_problems?group=app-' + UIDLRequestHandler.app.replace('\"', '').replace(' ','_')
 
-            header = '<div style="position: fixed;z-index: 1000000;top: 0px;right: 170px;"><button title="Report a problem" onclick="window.open(\'' + ticket + '\')" style="color: #333;padding: 7px 15px;border: 0px;">Submit a ticket</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\'' + close + '\'" style="color: #333;padding: 7px 15px;border: 0px;">Terminate Session</button></div>'
-            res = re.search("<body(?:\"[^\"]*\"['\"]*|'[^']*'['\"]*|[^'\">])+>", text)
+            text = text.replace("url = '" + UIDLRequestHandler.hub_url +
+                                "/api/", "url = '" + UIDLRequestHandler.path + "api/")
+
+            ticket = UIDLRequestHandler.hub_url + '/feedback/report_problems?group=app-' + \
+                UIDLRequestHandler.app.replace('\"', '').replace(' ', '_')
+
+            header = '<div style="position: fixed;z-index: 1000000;top: 0px;right: 170px;"><button title="Report a problem" onclick="window.open(\'' + ticket + \
+                '\')" style="color: #333;padding: 7px 15px;border: 0px;">Submit a ticket</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\'' + \
+                close + '\'" style="color: #333;padding: 7px 15px;border: 0px;">Terminate Session</button></div>'
+            res = re.search(
+                "<body(?:\"[^\"]*\"['\"]*|'[^']*'['\"]*|[^'\">])+>", text)
             if res is not None:
                 index = res.end() + 1
                 text = text[:index] + header + text[index:]
             res = re.search("sessiontoken=([0-9a-zA-Z])+&", text)
             if res is not None:
-                text = text[:res.start()] + "sessiontoken=" + UIDLRequestHandler.token + "&" + text[res.end():]
+                text = text[:res.start()] + "sessiontoken=" + \
+                    UIDLRequestHandler.token + "&" + text[res.end():]
             res = re.search("sessionnum=([0-9])+&", text)
             if res is not None:
-                text = text[:res.start()] + "sessionnum=" + UIDLRequestHandler.session + "&" + text[res.end():]
+                text = text[:res.start()] + "sessionnum=" + \
+                    UIDLRequestHandler.session + "&" + text[res.end():]
         elif path.startswith("api/"):
-            try :
+            try:
                 headers = {}
                 contentlength = 0
                 data = {}
@@ -125,12 +394,17 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                     try:
                         json.loads(field_data.decode())
                         data = field_data
-                    except:  
+                    except:
                         data = dict(parse_qsl(field_data))
-                if method == "post":
-                    res = requests.post(url, headers=headers, data=data, allow_redirects=False)
+                if (UIDLRequestHandler.local):
+                    res = UIDLRequestHandler.submit.handle(url, data)
                 else:
-                    res = requests.get(url, headers=headers, data=data, allow_redirects=False)
+                    if method == "post":
+                        res = requests.post(
+                            url, headers=headers, data=data, allow_redirects=False)
+                    else:
+                        res = requests.get(
+                            url, headers=headers, data=data, allow_redirects=False)
                 status = HTTPStatus(res.status_code)
                 text = res.text
             except:
@@ -146,7 +420,8 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-type", "text/html")
             self.send_header("Content-Length", str(len(text)))
-            self.send_header("Last-Modified", self.date_time_string(time.time()))
+            self.send_header(
+                "Last-Modified", self.date_time_string(time.time()))
             self.end_headers()
             if f:
                 try:
@@ -161,17 +436,14 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.do_REQUEST("get")
-        
 
     def do_POST(self):
         self.do_REQUEST("post")
 
-   
-            
     def translate_path(self, path):
         # abandon query parameters
-        path = path.split('?',1)[0]
-        path = path.split('#',1)[0]
+        path = path.split('?', 1)[0]
+        path = path.split('#', 1)[0]
         # Don't forget explicit trailing slash when normalizing. Issue17324
         trailing_slash = path.rstrip().endswith('/')
         try:
@@ -235,16 +507,18 @@ optional arguments:
     parser.add_argument('-a', '--app', dest='app', action='store', default=app)
     parser.add_argument('-t', '--token', dest='token', action='store', default=token)
     parser.add_argument('-w', '--path', dest='path', action='store', default=path)
+    parser.add_argument('-l', '--local', dest='local', action='store_true', default=False)
     parser.add_argument('-d', '--dir', dest='dir', action='store', default=os.environ['SESSIONDIR'])
     parser.add_argument('name')
     return parser
+
 
 def main():
 
     if os.getuid() == 0:
         print("Do not run this as root.", file=sys.stderr)
-        sys.exit(1)    
-    
+        sys.exit(1)
+
     parser = parse_cmd_line()
     args = parser.parse_args()
 
@@ -259,13 +533,15 @@ def main():
         UIDLRequestHandler.app = args.app
         UIDLRequestHandler.token = args.token
         UIDLRequestHandler.path = args.path
+        UIDLRequestHandler.local = args.local
         with socketserver.TCPServer((args.host, args.port), UIDLRequestHandler) as httpd:
-            print("Nanohub UIDL Server started at port", args.port, "using filename", args.name)
-            print("Server running on " + args.hub_url.replace("://","://proxy.")  + args.path)    
+            print("Nanohub UIDL Server started at port",
+                  args.port, "using filename", args.name)
+            print("Server running on " +
+                  args.hub_url.replace("://", "://proxy.") + args.path)
             try:
                 # Run the web server
                 httpd.serve_forever()
             except KeyboardInterrupt:
                 httpd.server_close()
                 print("Nanohub UIDL server has stopped.")
-    
