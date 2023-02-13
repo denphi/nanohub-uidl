@@ -564,20 +564,15 @@ class MaterialComponents():
     Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)    
     Paper.content.style = {"width" : "100%"}        
     IComponent = TeleportComponent("IconListMaterial", Paper)        
-    IComponent.addStateVariable("selected", {"type":"string", "defaultValue": {
-      "type": "dynamic",
-      "content": {
-        "referenceType": "prop",
-        "id": "onDefaultValue(self.props.options, self.props.default_value)"
-      }    
-    }})   
     IComponent.addStateVariable("open_expansion", {"type":"bool", "defaultValue": True})
     IComponent.addStateVariable("class_names", {"type":"object", "defaultValue": {}})
-    IComponent.addPropVariable("default_value", {"type":"string", "defaultValue": ""})
+    IComponent.addPropVariable("value", {"type":"string", "defaultValue": ""})
     IComponent.addPropVariable("options", {"type":"array", "defaultValue": []})
     IComponent.addPropVariable("onChange", {"type":"func", "defaultValue": "(e)=>{}"})
-    IComponent.addPropVariable("onDefaultValue", {"type":"func", "defaultValue": "(l,v)=>{return l.find((e)=>{return e.key==v})}"})
-    
+    IComponent.addPropVariable("getName", {
+                               "type": "func", "defaultValue": "(l,v)=>{let j=l.find((e)=>{return e.key==v}); if (j){ return j.name;} else { return '';} }"})
+    IComponent.addPropVariable("getPath", {
+                               "type": "func", "defaultValue": "(l,v)=>{let j=l.find((e)=>{return e.key==v}); if (j){ return j.icon;} else { return '';} }"})
     bvalues = { True : "primary",  False : "secondary"}    
     ExpansionPanel = TeleportElement(MaterialContent(elementType="Accordion"))
     ExpansionPanel.content.attrs["expanded"] = {
@@ -604,8 +599,8 @@ class MaterialComponents():
     ConditionalIcon.reference = {
         "type": "dynamic",
         "content": {
-          "referenceType": "state",
-          "id": "selected.key"
+          "referenceType": "prop",
+          "id": "value"
         }    
     }
     ConditionalIcon.value = "$local.key"
@@ -623,8 +618,9 @@ class MaterialComponents():
 
     Typography = TeleportElement(MaterialContent(elementType="Typography"))
     Typography.content.attrs["variant"] = "body1"
-    TypographyText = TeleportDynamic(content={"referenceType": "state","id": "selected.name"})
-    Typography.addContent(TypographyText)   
+    TypographyText = TeleportDynamic(
+        content={"referenceType": "prop", "id": "getName(self.props.options, self.props.value)"})
+    Typography.addContent(TypographyText)
     Typography.addContent(TeleportStatic(content="  "))
     ExpansionPanelSummary.addContent(Typography)        
                                            
@@ -647,17 +643,12 @@ class MaterialComponents():
         "type": "dynamic",
         "content": {
           "referenceType": "local",
-          "id": "(local.key == this.state.selected.key)?'primary':'secondary'"
+          "id": "(local.key == this.props.value)?'primary':'secondary'"
         }  
     }
 
     IconButton.content.style = {'border' : '2px solid #F2F1F1', 'width':'50px', 'height':'50px', 'border-radius':'50%', 'font-size':'25px'}
     IconButton.content.events["click"] = [
-        {
-          "type": "stateChange",
-          "modifies": "selected",
-          "newState": "$local"
-        },
         #{
         #  "type": "stateChange",
         #  "modifies": "open_expansion",
@@ -720,7 +711,8 @@ class MaterialComponents():
 
     Typography = TeleportElement(MaterialContent(elementType="Typography"))
     Typography.content.attrs["variant"] = "body1"
-    TypographyText = TeleportDynamic(content={"referenceType": "state","id": "selected.name"})
+    TypographyText = TeleportDynamic(
+        content={"referenceType": "prop", "id": "getName(self.props.options, self.props.value)"})
     Typography.addContent(TypographyText)   
     Typography.addContent(TeleportStatic(content="  "))
     ExpansionPanelSummary.addContent(Typography)        
@@ -745,16 +737,11 @@ class MaterialComponents():
         "type": "dynamic",
         "content": {
           "referenceType": "local",
-          "id": "(local.key == this.state.selected.key)?'primary':'secondary'"
+          "id": "(local.key == this.props.value)?'primary':'secondary'"
         }  
     }
     FabButton2.content.attrs["variant"] = "extended"
     FabButton2.content.events["click"] = [
-        {
-          "type": "stateChange",
-          "modifies": "selected",
-          "newState": "$local"
-        },
         {
           "type": "stateChange",
           "modifies": "open_expansion",
@@ -805,18 +792,12 @@ class MaterialComponents():
     BLMComponent.addPropVariable("hide_header", {"type":"bool", "defaultValue": False})
     BLMComponent.addPropVariable("options", {"type":"array", "defaultValue": []})
     BLMComponent.addPropVariable("onChange", {"type":"func", "defaultValue": "(e)=>{}"})
-    BLMComponent.addPropVariable("onDefaultValue", {"type":"func", "defaultValue": "(l,v)=>{let j=l.find((e)=>{return e.key==v}); if (j){ return j;} else { return {key:'', value:''};} }"})
-    BLMComponent.addPropVariable("default_value", {"type":"string", "defaultValue": ""})
+    BLMComponent.addPropVariable("getName", {"type":"func", "defaultValue": "(l,v)=>{let j=l.find((e)=>{return e.key==v}); if (j){ return j.name;} else { return '';} }"})
+    BLMComponent.addPropVariable("value", {"type":"string", "defaultValue": ""})
 
     BLMComponent.addStateVariable("open_expansion", {"type":"bool", "defaultValue": True})
     BLMComponent.addStateVariable("class_names", {"type":"object", "defaultValue": {}})
-    BLMComponent.addStateVariable("selected", {"type":"string", "defaultValue": {
-      "type": "dynamic",
-      "content": {
-        "referenceType": "prop",
-        "id": "onDefaultValue(self.props.options, self.props.default_value)"
-      }    
-    }})
+
     tp.addComponent("ButtonListMaterial", BLMComponent);
     return "ButtonListMaterial"
     
@@ -967,18 +948,14 @@ class MaterialComponents():
     Paper = TeleportElement(MaterialContent(elementType="Paper")) 
     Paper.content.attrs['elevation'] = kwargs.get("elevation", 0)    
     Paper.content.style = {"width" : "100%"}        
-    CComponent = TeleportComponent("ColorSliders", Paper)        
-    CComponent.addStateVariable("colors", {"type":"array", "defaultValue": {
-      "type": "dynamic",
-      "content": {
-        "referenceType": "prop",
-        "id": "colors"
-      }    
-    }})   
+    CComponent = TeleportComponent("ColorSliders", Paper)       
+
+    CComponent.addPropVariable("colors", {"type":"object", "defaultValue": {}})
+ 
     eol = "\n"
     updateState = ""
     updateState += "(c,i,a,v)=>{ " + eol
-    updateState += "  let new_colors = c.state.colors.map((e, ii)=>{" + eol
+    updateState += "  let new_colors = c.props.colors.map((e, ii)=>{" + eol
     updateState += "    if(ii==i){" + eol
     updateState += "      let clone = JSON.parse(JSON.stringify(e));" + eol
     updateState += "      clone[a]=v;" + eol
@@ -1029,7 +1006,7 @@ class MaterialComponents():
     IconButton.content.events["click"] = [{        
         "type": "propCall2",
         "calls": "updateState",
-        "args": ["self", "index", "'visible'", '!self.state.colors[index].visible']
+        "args": ["self", "index", "'visible'", '!self.props.colors[index].visible']
     }]
     Icon = TeleportElement(MaterialContent(elementType="Icon"))
     Icon.addContent(TeleportDynamic(content={"referenceType": "local","id": "local.visible?'visibility':'visibility_off'"}))   
@@ -1069,7 +1046,7 @@ class MaterialComponents():
     IconButton2.content.events["click"] = [{        
         "type": "propCall2",
         "calls": "updateState",
-        "args": ["self", "index", "'color'", 'self.props.nextColor(self, self.state.colors[index].color)']
+        "args": ["self", "index", "'color'", 'self.props.nextColor(self, self.props.colors[index].color)']
     }]        
     IconButton2.content.style = {'font-size':'25px'}
 
@@ -1104,7 +1081,7 @@ class MaterialComponents():
     RepeatButtons.dataSource = {
         "type": "dynamic",
         "content": {
-          "referenceType": "state",
+          "referenceType": "prop",
           "id": "colors"
         }    
     }    

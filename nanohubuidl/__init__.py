@@ -75,13 +75,14 @@ class SubmitLocal():
                     if len(jobid) == 2:
                         id = open(os.path.join(subdir, file),"r").read().strip()
                         self.squidmap[id] = jobid[1]
-        resourcePath = os.environ['rpath_user']
-        if os.path.exists(resourcePath):
-            fpResource = open(resourcePath,'r')
-            records = fpResource.readlines()
-            for record in records:
-                if record.startswith('squiddb '):
-                    self.squiddb = record.split()[1]
+        if 'rpath_user' in os.environ:
+            resourcePath = os.environ['rpath_user']
+            if os.path.exists(resourcePath):
+                fpResource = open(resourcePath,'r')
+                records = fpResource.readlines()/notebooks/examples/Untitled.ipynb
+                for record in records:
+                    if record.startswith('squiddb '):
+                        self.squiddb = record.split()[1]
 
     def handle(self, url, data={}):
         obj = Response()

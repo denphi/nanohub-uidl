@@ -464,7 +464,7 @@ class FormHelper():
   def ButtonList(component, label, description, state, value, options,*args, **kwargs):
     if (state not in component.stateDefinitions):  
       component.addStateVariable(state, {"type":"string", "defaultValue": value})
-    component.addStateVariable(state+"_options", {"type":"object", "defaultValue": [
+    component.addStateVariable(state+"_options", {"type":"list", "defaultValue": [
         {'key':k, 'name':v['name']}  for k,v in options.items()
     ]})
 
@@ -488,7 +488,13 @@ class FormHelper():
     InputLabel.addContent(InputLabelText)    
     
     ButtonListMaterial = TeleportElement(TeleportContent(elementType="ButtonListMaterial"))
-    ButtonListMaterial.content.attrs["default_value"] = value
+    ButtonListMaterial.content.attrs["value"] =  {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": state
+      }    
+    }
     ButtonListMaterial.content.attrs["description"] = description
     ButtonListMaterial.content.attrs["options"] = {
       "type": "dynamic",
@@ -518,7 +524,7 @@ class FormHelper():
   def IconList(component, label, description, state, value, options,*args, **kwargs):
     if (state not in component.stateDefinitions):  
       component.addStateVariable(state, {"type":"string", "defaultValue": value})
-    component.addStateVariable(state+"_options", {"type":"object", "defaultValue": [
+    component.addStateVariable(state+"_options", {"type":"list", "defaultValue": [
         {'key':k, 'icon':v['icon'], 'name':v['name']} 
         for k,v in options.items()
     ]})
@@ -543,7 +549,13 @@ class FormHelper():
     InputLabel.addContent(InputLabelText)    
     
     IconListMaterial = TeleportElement(TeleportContent(elementType="IconListMaterial"))
-    IconListMaterial.content.attrs["default_value"] = value
+    IconListMaterial.content.attrs["value"] = {
+      "type": "dynamic",
+      "content": {
+        "referenceType": "state",
+        "id": state
+      }  
+    }
     IconListMaterial.content.attrs["description"] = description
     IconListMaterial.content.attrs["options"] = {
       "type": "dynamic",
@@ -1231,42 +1243,53 @@ class AppBuilder():
         "newState": "$e.target.value"
       }]
       Grid.addContent(MaterialBuilder.GridItem(content=ColorSliders0, style={'padding':'0px'}))
-
+      eol = "\n"
+      updateState = ""
+      updateState += "(c,i,a,v)=>{ " + eol
+      updateState += "  let new_map = c.state.planes.map((e, ii)=>{" + eol
+      updateState += "    if(ii==i){" + eol
+      updateState += "      let clone = JSON.parse(JSON.stringify(e));" + eol
+      updateState += "      clone[a] = v.split('').map((k)=>Number(k));" + eol
+      updateState += "      return clone;" + eol
+      updateState += "    }" + eol
+      updateState += "    return e;" + eol
+      updateState += "  })" + eol
+      updateState += "  c.setState({'planes' : new_map});" + eol
+      updateState += "  if (c.timeout){" + eol
+      updateState += "    clearTimeout(c.timeout)" + eol
+      updateState += "  }" + eol
+      updateState += "  c.timeout = setTimeout(()=>{ c.props.onChange( {'target':{'value':new_map}} ) }, 20);" + eol
+      updateState += "}" + eol
+      Component.addPropVariable("updateState", {
+          "type":"func", 
+          "defaultValue": updateState
+      })     
       for s,v in sliders.items():
         if 'options' in v:
-            Component.addStateVariable(s, {"type":"object", "defaultValue":{
-              'id':list(v['options'].keys())[0],
-              'planes':v['options'],   
-              'options':[{'key':k,'name':k} for k, v in v['options'].items()],
-            }})
+            Component.addStateVariable(
+                s, {"type": "string", "defaultValue": list(v['options'].keys())[0]})
             ButtonListMaterial = TeleportElement(TeleportContent(elementType="ButtonListMaterial"))
             ButtonListMaterial.content.attrs["always_open"] = True
             ButtonListMaterial.content.attrs["hide_header"] = True
-            ButtonListMaterial.content.attrs["default_value"] = {
+            ButtonListMaterial.content.attrs["value"] = {
               "type": "dynamic",
               "content": {
                 "referenceType": "state",
-                "id": s + ".id"
+                "id": s + ""
               }    
             }
             ButtonListMaterial.content.attrs["description"] = ""
-            ButtonListMaterial.content.attrs["options"] = {
-              "type": "dynamic",
-              "content": {
-                "referenceType": "state",
-                "id": s + ".options"
-              }    
-            }
+            ButtonListMaterial.content.attrs["options"] = [{"key": k, "name": k} for k, v in (v['options'].items())]
             ButtonListMaterial.content.events["change"]=[
               {
                 "type": "stateChange",
-                "modifies": s + ".id",
+                "modifies": s ,
                 "newState": "$e.target.value"
               },
               {
-                "type": "stateChange",
-                "modifies": "planes",
-                "newState": "$self.state.planes.map((m,i)=>{if (i==3) m.plane=self.state."+ s +".planes[e.target.value]; return m;})"
+                  "type": "propCall2",
+                  "calls": "updateState",
+                  "args": ["self", "3", "'plane'", 'e.target.value']
               }
             ]
             Grid.addContent(MaterialBuilder.GridItem(content=ButtonListMaterial, style={'padding':'0px'}))

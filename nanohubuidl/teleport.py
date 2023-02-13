@@ -634,6 +634,8 @@ class TeleportContent():
               v = "self.props." + content["id"] + "";
             elif ("referenceType" in content and content["referenceType"] == "local"):
               v = "" + content["id"] + "";
+        else:
+            v = str(json.dumps(v))
       else: 
         if isinstance(v, str) and v.startswith("$"):
             v = v.replace("$", "")

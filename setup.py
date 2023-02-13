@@ -61,6 +61,7 @@ setup_args = {
     'include_package_data' : True,
     'install_requires' : [
         'nanohub-remote>=0.1.0',
+        'simtool',
     ],
     'extras_require' : {
         'test': [
@@ -73,7 +74,7 @@ setup_args = {
     },
     'entry_points' : {
         'console_scripts': [
-            'run_uidl = nanohub.uidl:main'
+            'run_uidl = nanohubuidl:main'
         ],
     },
 }
