@@ -545,6 +545,8 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                 status = HTTPStatus.INTERNAL_SERVER_ERROR
                 raise
         else:
+            parent = os.path.dirname(os.path.abspath(UIDLRequestHandler.filename))
+            path = os.path.join(parent, path)
             if os.path.exists(path):
                 try:
                     ctype = self.guess_type(path)
