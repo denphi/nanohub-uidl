@@ -15,6 +15,7 @@
         <td>
             <a href="https://pepy.tech/project/nanohub-uidl"/>
             <img src="https://pepy.tech/badge/nanohub-uidl/month"/>
+            <img src="https://pepy.tech/badge/nanohub-uidl"/>
         </td>
     </tr>
 </table>
