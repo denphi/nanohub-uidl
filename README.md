@@ -1,5 +1,25 @@
 # Nanohub - UIDL
 
+# UIDL Stats
+
+<table>
+    <tr>
+        <td>Latest Release</td>
+        <td>
+            <a href="https://pypi.org/project/nanohub-uidl/"/>
+            <img src="https://badge.fury.io/py/nanohub-uidl.svg"/>
+        </td>
+    </tr>
+    <tr>
+        <td>PyPI Downloads</td>
+        <td>
+            <a href="https://pepy.tech/project/nanohub-uidl"/>
+            <img src="https://pepy.tech/badge/nanohub-uidl/month"/>
+            <img src="https://pepy.tech/badge/nanohub-uidl"/>
+        </td>
+    </tr>
+</table>
+
 A set of tools to create Javascript apps to consume nanohub WS
 
 ## Installation
