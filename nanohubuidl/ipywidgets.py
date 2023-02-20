@@ -218,7 +218,7 @@ def buildWidget(Project, *args, **kwargs):
     js += "  paths: {" + eol
     for k, v in Project.libraries.items():
         if kwargs.get("jupyter_axios", False) == False or k != "axios":
-            js += "    '" + k + "': '" + v + "',\n"
+            js += "    '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
     js += "  }" + eol
     js += "});" + eol
     js += "require.undef('" + component + "');" + eol

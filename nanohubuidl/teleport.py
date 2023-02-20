@@ -467,17 +467,17 @@ class TeleportProject:
         self.components = {}
         self.ref = uuid.uuid4()
         self.libraries = {
-            "react": "https://unpkg.com/react@16.8.6/umd/react.production.min",
-            "react-dom": "https://unpkg.com/react-dom@16.8.6/umd/react-dom.production.min",
+            "react": "https://unpkg.com/react@16.8.6/umd/react.production.min.js",
+            "react-dom": "https://unpkg.com/react-dom@16.8.6/umd/react-dom.production.min.js",
             "material-ui": "https://unpkg.com/@material-ui/core@4.12.3/umd/material-ui.production.min.js",
-            "materiallab-ui": "https://cdn.jsdelivr.net/npm/material-ui-lab-umd",
-            "plotlycomponent": "https://unpkg.com/react-plotly.js@2.6/dist/create-plotly-component",
+            "materiallab-ui": "https://unpkg.com/material-ui-lab-umd@4.0.0-alpha.32/material-ui-lab.development.js",
+            "plotlycomponent": "https://unpkg.com/react-plotly.js@2.6.0/dist/create-plotly-component.js",
             "plotly": "https://cdn.plot.ly/plotly-latest.min.js",
             "math": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min.js",
-            "axios": "https://unpkg.com/axios/dist/axios.min",
-            "localforage": "https://www.unpkg.com/localforage@1.7.3/dist/localforage.min",
-            "number-format": "https://unpkg.com/react-number-format@4.3.1/dist/react-number-format",
-            "prop-types": "https://unpkg.com/prop-types@15.6/prop-types.min",
+            "axios": "https://unpkg.com/axios/dist/axios.min.js",
+            "localforage": "https://www.unpkg.com/localforage@1.7.3/dist/localforage.min.js",
+            "number-format": "https://unpkg.com/react-number-format@4.3.1/dist/react-number-format.js",
+            "prop-types": "https://unpkg.com/prop-types@15.6/prop-types.min.js",
             "require": "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js",
         }
 
@@ -555,7 +555,7 @@ class TeleportProject:
         react += "<title>" + self.project_name + "</title>\n"
         react += (
             "<script src='"
-            + libraries["require"].replace(".js", "")
+            + libraries["require"][::-1].replace("sj.","",1)[::-1]
             + ".js'></script>\n"
         )
         react += "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>\n"
@@ -570,7 +570,7 @@ class TeleportProject:
         react += "    waitSeconds: 200,\n"
         react += "    paths: {\n"
         for k, v in libraries.items():
-            react += "        '" + k + "': '" + v.replace(".js", "") + "',\n"
+            react += "        '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
         react += "    }\n"
         react += "});\n"
         react += "requirejs(['react', 'react-dom'], function(React, ReactDOM) {\n"
