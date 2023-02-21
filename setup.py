@@ -39,8 +39,13 @@ setup_args = {
     'version'         : version,
     'scripts'         : glob(pjoin('scripts', '*')),
     'packages'        : find_packages(),
-    'data_files'      : [('assets', [
-                        ])],
+    'data_files'      : [
+        ('assets', []),
+        (
+            'etc/jupyter/jupyter_server_config.d',
+            ['jupyter-config/jupyter_server_config.d/nanohubuidl.json']
+        )
+    ],
     'author'          : 'Nanohub',
     'author_email'    : 'denphi@denphi.com',
     'url'             : 'https://github.com/denphi/nanohub-uidl',
@@ -67,7 +72,6 @@ setup_args = {
         'test': [
         ],
         'examples': [
-            # Any requirements for the examples to run
         ],
         'docs': [
         ],

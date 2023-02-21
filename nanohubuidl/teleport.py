@@ -608,7 +608,23 @@ class TeleportProject:
 
         print("done!")
 
-        return react
+        run_uidl = kwargs.get("run_uidl", None)
+        jupyter_notebook_url = kwargs.get("jupyter_notebook_url", None)
+        if run_uidl in ["local", "redirect", "direct"]:
+            if jupyter_notebook_url is not None:
+                if os.path.exists(filename):
+                    bp = os.readlink('/proc/%s/cwd' % os.environ['JPY_PARENT_PID'])
+                    ap = os.path.abspath(filename)
+                    if ap.startswith(bp):
+                        link = "/".join(jupyter_notebook_url.split("/", 8)[:7])
+                        link += "/uidl/" + filename + "/" +run_uidl + "/" + os.path.relpath(ap, bp)
+                        print(link)
+                    else:
+                        print("Dont have access to the file")
+                else:
+                    print(filepath + " does not exists")
+            else:
+                print("jupyter_notebook_url parameters is required")
 
     def displayWidget(self, *args, **kwargs):
         filename = "__TMPReactBuld.dat"
