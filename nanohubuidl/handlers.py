@@ -132,12 +132,20 @@ class SubmitLocal:
         for k in inputs:
             response["inputs"][k] = {}
             for k2 in inputs[k]:
-                response["inputs"][k][k2] = str(inputs[k][k2])
+                try:
+                    json.dumps(inputs[k][k2])
+                    response["inputs"][k][k2] = inputs[k][k2]
+                except:
+                    response["inputs"][k][k2] = str(inputs[k][k2])
         response["outputs"] = {}
         for k in outputs:
             response["outputs"][k] = {}
             for k2 in outputs[k]:
-                response["outputs"][k][k2] = str(outputs[k][k2])
+                try:
+                    json.dumps(outputs[k][k2])
+                    response["outputs"][k][k2] = outputs[k][k2]
+                except:
+                    response["outputs"][k][k2] = str(outputs[k][k2])
         response["message"] = None
         response["response_time"] = time.time() - t
         response["success"] = True
@@ -745,6 +753,7 @@ class UIDLLocalHandler(UIDLHandler):
             try:
                 res = UIDLLocalHandler.submit.handle(path, self.filter_data())
                 status = HTTPStatus(res.status_code)
+                self.set_status(res.status_code)
                 self.finish(res.text)
             except:
                 raise tornado.web.HTTPError(500, 'Error')
@@ -789,6 +798,7 @@ class UIDLRedirectHandler(UIDLHandler):
                 res = requests.get(
                     url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False
                 )
+                self.set_status(res.status_code)
                 self.finish(res.text)
             except:
                 raise tornado.web.HTTPError(500, 'Error')
@@ -810,6 +820,7 @@ class UIDLRedirectHandler(UIDLHandler):
                 res = requests.post(
                     url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False
                 )
+                self.set_status(res.status_code)
                 self.finish(res.text)
             except:
                 raise tornado.web.HTTPError(500, 'Error')
