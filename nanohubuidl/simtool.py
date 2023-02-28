@@ -38,7 +38,7 @@ class SimtoolBuilder:
                 "id": kwargs.get("open", "loader_open"),
             },
         }
-        Loader.content.attrs["disableBackdropClick"] = True
+        #Loader.content.attrs["disableBackdropClick"] = True
         Loader.content.attrs["disableEscapeKeyDown"] = True
         Loader.content.attrs["fullWidth"] = True
         Loader.content.attrs["maxWidth"] = "xs"

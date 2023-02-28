@@ -34,7 +34,9 @@ import http.client
 import email.utils
 import mimetypes
 import posixpath
-
+import base64
+import tempfile
+from PIL import Image
         
 class SubmitLocal:
     def __init__(self, *args, jobspath=None, **kwargs):
@@ -179,6 +181,17 @@ class SubmitLocal:
         simToolRevision = "r" + request["revision"]
         simToolLocation = searchForSimTool(simToolName, simToolRevision)
         inputsSchema = getSimToolInputs(simToolLocation)
+        for k,v in request["inputs"].items():
+            if isinstance(v, str) and v.startswith('base64://'):
+                #if inputsSchema[k].type == "Image":
+                #    request["inputs"][k] = Image.open(io.BytesIO(base64.b64decode(v[9:])))
+                if inputsSchema[k].type == "Image" or inputsSchema[k].type == "File":
+                    fname = os.path.join(self.jobspath, ".tmp." + next(tempfile._get_candidate_names()))
+                    while (os.path.exists(fname)):
+                        fname = os.path.join(self.jobspath, ".tmp." + next(tempfile._get_candidate_names()))
+                    with open(fname, "wb") as f:
+                        f.write(base64.b64decode(v[9:]))
+                    request["inputs"][k] = "file://" + fname
         inputs = getParamsFromDictionary(inputsSchema, request["inputs"])
         hashableInputs = _get_inputs_cache_dict(inputs)
         response["userinputs"] = _get_inputs_dict(inputs)
@@ -276,6 +289,10 @@ class SubmitLocal:
                     with open(os.path.join(jobpath, ".results"), "w") as outfile:
                         json.dump(dictionary, outfile)
                     id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
+                    for k in inputs:
+                        v = inputs[k].value
+                        if isinstance(v, str) and ".tmp." in v :
+                            os.unlink(f.name)
                     self.squidmap[id] = jobid
 
         except Exception as e:

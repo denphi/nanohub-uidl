@@ -86,7 +86,7 @@ class Auth:
             "type": "dynamic",
             "content": {"referenceType": "prop", "id": "open"},
         }
-        Dialog.content.attrs["disableBackdropClick"] = True
+        #Dialog.content.attrs["disableBackdropClick"] = True
         Dialog.content.attrs["disableEscapeKeyDown"] = True
         Dialog.content.attrs["fullWidth"] = True
         Dialog.content.attrs["maxWidth"] = "xs"
@@ -359,7 +359,7 @@ class Auth:
             "type": "dynamic",
             "content": {"referenceType": "state", "id": "open"},
         }
-        Dialog.content.attrs["disableBackdropClick"] = True
+        #Dialog.content.attrs["disableBackdropClick"] = True
         Dialog.content.attrs["disableEscapeKeyDown"] = True
         Dialog.content.attrs["fullWidth"] = True
         Dialog.content.attrs["maxWidth"] = "xs"
@@ -383,7 +383,7 @@ class Auth:
         SComponent.node.addContent(Dialog)
 
         AuthSession = TeleportElement(TeleportContent(elementType="AuthSession"))
-        Dialog.content.events["onEntered"] = Auth.validateSession(
+        onLoad = Auth.validateSession(
             tp,
             SComponent,
             sessiontoken=kwargs.get("sessiontoken", ""),
@@ -391,6 +391,8 @@ class Auth:
             url=kwargs.get("url", ""),
         )
         tp.components["AuthSession"] = SComponent
+        
+
         return AuthSession, SComponent
 
     def validateSession(tp, Component, *args, **kwargs):
@@ -496,10 +498,10 @@ class Auth:
         js += "  }" + eol
         js += "}" + eol
         Component.addPropVariable(
-            "validateSession", {"type": "func", "defaultValue": js}
+            "onLoad", {"type": "func", "defaultValue": js}
         )
 
-        return [{"type": "propCall2", "calls": "validateSession", "args": ["self"]}]
+        return [{"type": "propCall2", "calls": "onLoad", "args": ["self"]}]
 
     def refreshToken(tp, Component, *args, **kwargs):
         store_name = "sessionStore"

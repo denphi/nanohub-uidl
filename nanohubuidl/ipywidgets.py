@@ -3,6 +3,7 @@ from .material import *
 from .rappture import *
 from .plotly import *
 import re
+import copy
 
 import ipywidgets as widgets
 from traitlets import (
@@ -21,7 +22,9 @@ import xml, re, json, uuid
 from IPython.display import HTML, Javascript, display
 
 
-def buildWidget(Project, *args, **kwargs):
+def buildWidget(proj, *args, **kwargs):
+    
+    Project = copy.deepcopy(proj)
     component = Project.project_name
     component = re.sub("[^a-zA-Z]+", "", component)
     Project.root.name_component = component
@@ -317,7 +320,6 @@ def buildWidget(Project, *args, **kwargs):
     js += "    'underscore', " + eol
     js += "    'patchreact', " + eol
     js += "    'react-dom'," + eol
-    js += "    'materiallab-ui'," + eol
     js += "    'material-ui'," + eol
     js += "    'number-format'," + eol
     js += "    'axios'," + eol
@@ -331,7 +333,6 @@ def buildWidget(Project, *args, **kwargs):
     js += "    _, " + eol
     js += "    React, " + eol
     js += "    ReactDOM," + eol
-    js += "    MaterialLab," + eol
     js += "    Material," + eol
     js += "    Format," + eol
     js += "    Axios," + eol
@@ -509,7 +510,9 @@ def buildWidget(Project, *args, **kwargs):
         + ");"
         + eol
     )
-    js += "        ReactDOM.render(App, backbone.app);" + eol
+    js += "        const container = backbone.app;" + eol
+    js += "        const root = ReactDOM.createRoot(container);" + eol
+    js += "        root.render(App);" + eol
     js += "        backbone.el.append(backbone.app);" + eol
     js += "      }," + eol
 

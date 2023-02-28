@@ -27,31 +27,6 @@ class MaterialContent(TeleportContent):
         return tjson
 
 
-class MaterialLabContent(TeleportContent):
-    def __init__(self, *args, **kwargs):
-        self.dependency = {
-            "type": "package",
-            "path": "material-ui-lab-umd",
-            "version": "latest",
-            "meta": {"namedImport": True},
-        }
-        #'materiallab-ui': 'https://cdn.jsdelivr.net/npm/material-ui-lab-umd@latest/material-ui-lab.production.min',
-        super().__init__(self, *args, **kwargs)
-
-    def buildElementType(self):
-        elementType = self.semanticType
-        if elementType is None:
-            elementType = self.elementType
-        return "MaterialLab." + elementType
-
-    def __json__(self):
-        tjson = super().__json__()
-        tjson["dependency"] = self.dependency
-        if self.elementType != None:
-            tjson["semanticType"] = "Material." + self.elementType
-            tjson["dependency"]["meta"]["originalName"] = self.elementType
-        return tjson
-
 
 class MaterialBuilder:
     def AppBar(*args, **kwargs):
@@ -86,7 +61,7 @@ class MaterialBuilder:
                     "border": "2px solid #F2F1F1",
                     "width": "50px",
                     "height": "50px",
-                    "border-radius": "50%",
+                    "borderRadius": "50%",
                 }
 
                 IconButton.content.events["click"] = [
@@ -133,7 +108,7 @@ class MaterialBuilder:
                 "border": "2px solid #F2F1F1",
                 "width": "50px",
                 "height": "50px",
-                "border-radius": "50%",
+                "borderRadius": "50%",
             }
 
             if kwargs.get("onClickMenu", None) is not None:
@@ -325,7 +300,9 @@ class MaterialBuilder:
         primary_button_bg = kwargs.get("primary_button_bg", "#3f51b5")
         secondary_button_bg = kwargs.get("secondary_button_bg", "#f50057")
         drawer_position = kwargs.get("drawer_position", "fixed")
+        
         return {
+            
             "shadows": ["none" for i in range(25)],
             "palette": {
                 "primary": {
@@ -335,145 +312,159 @@ class MaterialBuilder:
                     "main": secondary_color,
                 },
             },
-            "overrides": {
+            "components": {
                 "MuiPaper": {
-                    "root": {"color": "rgba(0, 0, 0, 0.54)"},
+                    "styleOverrides": {
+                        "root": {"color": "rgba(0, 0, 0, 0.54)"},
+                    }
                 },
                 "MuiGrid": {
-                    "item": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "padding": "4px",
+                    "styleOverrides": {
+                        "item": {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "padding": "4px",
+                        }
                     }
                 },
                 "MuiDrawer": {
-                    "paper": {
-                        "width": "350px",
-                        "margin-top": "56px",
-                        "height": "calc(100% - 56px)",
-                        "position": drawer_position,
+                    "styleOverrides": {
+                        "paper": {
+                            "width": "350px",
+                            "marginTop": "56px",
+                            "height": "calc(100% - 56px)",
+                            "position": drawer_position,
+                        }
                     }
                 },
                 "MuiAppBar": {
-                    "colorPrimary": {"backgroundColor": primary_bg},
-                    "colorSecondary": {"backgroundColor": secondary_bg},
+                    "styleOverrides": {
+                        "colorPrimary": {"backgroundColor": primary_bg},
+                        "colorSecondary": {"backgroundColor": secondary_bg},
+                    }
                 },
-                #'MuiButtonBase' : {
-                #    'root' : {
-                #        'text-transform' : 'none',
-                #        'padding' : '6px 16px',
-                #        'border-radius' : '4px',
-                #    },
-                # },
                 "MuiButton": {
-                    "root": {
-                        "text-transform": "none",
-                    },
-                    "contained": {
-                        "color": default_button,
-                        "background-color": default_button_bg,
-                    },
-                    "containedPrimary": {
-                        "color": primary_button,
-                        "background-color": primary_button_bg,
-                    },
-                    "containedSecondary": {
-                        "color": secondary_button,
-                        "background-color": secondary_button_bg,
-                    },
+                    "styleOverrides": {
+
+                        "root": {
+                            "textTransform": "none",
+                        },
+                        "contained": {
+                            "color": default_button,
+                            "backgroundColor": default_button_bg,
+                        },
+                        "containedPrimary": {
+                            "color": primary_button,
+                            "backgroundColor": primary_button_bg,
+                        },
+                        "containedSecondary": {
+                            "color": secondary_button,
+                            "backgroundColor": secondary_button_bg,
+                        },
+                    }
                 },
                 "MuiGrid": {
-                    "item": {
-                        "padding": "4px 25px",
-                        "margin": "0",
-                        "display": "flex",
-                        "box-sizing": "border-box",
-                        "flex-direction": "column",
-                    },
-                    "container": {"width": "none"},
+                    "styleOverrides": {
+                        "item": {
+                            "padding": "4px 25px",
+                            "margin": "0",
+                            "display": "flex",
+                            "boxSizing": "border-box",
+                            "flexDirection": "column",
+                        },
+                        "container": {"width": "none"},
+                    }
                 },
-                "MuiExpansionPanelSummary": {
-                    "expandIcon": {"font-family": "Material Icons"},
-                    "content": {
-                        "margin": "2px",
-                        "&$expanded": {
-                            "margin": "2px 0",
-                        },
-                    },
-                    "root": {
-                        "minHeight": 40,
-                        "&$expanded": {
-                            "minHeight": 40,
-                        },
+                "MuiAccordionSummary": {
+                    "styleOverrides": {
+                        "expandIconWrapper": {"fontFamily": "Material Icons"},
                     },
                 },
                 "MuiExpansionPanel": {
-                    "root": {
-                        "&$expanded": {"margin": "0px"},
-                    },
+                    "styleOverrides": {
+                        "root": {
+                            "&$expanded": {"margin": "0px"},
+                        },
+                    }
                 },
                 "MuiFormHelperText": {
-                    "root": {
-                        "-webkit-touch-callout": "none",
-                        "-webkit-user-select": "none",
-                        "-khtml-user-select": "none",
-                        "-moz-user-select": "none",
-                        "-ms-user-select": "none",
-                        "user-select": "none",
-                    },
+                    "styleOverrides": {
+                        "root": {
+                            "WebkitTouchCallout": "none",
+                            "WebkitUserSelect": "none",
+                            "KhtmlUserSelect": "none",
+                            "MozUserSelect": "none",
+                            "msUserSelect": "none",
+                            "userSelect": "none",
+                        },
+                    }
                 },
                 "MuiFormLabel": {
-                    "root": {
-                        "-webkit-touch-callout": "none",
-                        "-webkit-user-select": "none",
-                        "-khtml-user-select": "none",
-                        "-moz-user-select": "none",
-                        "-ms-user-select": "none",
-                        "user-select": "none",
-                    },
+                    "styleOverrides": {
+                        "root": {
+                            "WebkitTouchCallout": "none",
+                            "WebkitUserSelect": "none",
+                            "KhtmlUserSelect": "none",
+                            "MozUserSelect": "none",
+                            "msUserSelect": "none",
+                            "userSelect": "none",
+                        },
+                    }
                 },
                 "MuiTypography": {
-                    "root": {
-                        "-webkit-touch-callout": "none",
-                        "-webkit-user-select": "none",
-                        "-khtml-user-select": "none",
-                        "-moz-user-select": "none",
-                        "-ms-user-select": "none",
-                        "user-select": "none",
-                    },
-                    "body1": {"font-size": "0.9rem"},
+                    "styleOverrides": {
+                        "root": {
+                            "WebkitTouchCallout": "none",
+                            "WebkitUserSelect": "none",
+                            "KhtmlUserSelect": "none",
+                            "MozUserSelect": "none",
+                            "msUserSelect": "none",
+                            "userSelect": "none",
+                        },
+                        "body1": {"fontSize": "0.9rem"},
+                    }
                 },
-                "MuiInputBase": {"root": {"font-size": "0.9rem"}},
+                "MuiInputBase": {
+                    "styleOverrides": {
+                        "root": {"fontSize": "0.9rem"}
+                    }
+                },
                 "MuiIconButton": {
-                    "root": {"padding": "10px"},
-                    "colorPrimary": {
-                        "color": primary_button,
-                        "background-color": primary_button_bg,
-                    },
-                    "colorSecondary": {
-                        "color": secondary_button,
-                        "background-color": secondary_button_bg,
-                    },
-                    "label": {
-                        "font-family": "Material Icons",
-                    },
+                    "styleOverrides": {
+                        "root": {"padding": "10px"},
+                        "colorPrimary": {
+                            "color": primary_button,
+                            "backgroundColor": primary_button_bg,
+                        },
+                        "colorSecondary": {
+                            "color": secondary_button,
+                            "backgroundColor": secondary_button_bg,
+                        },
+                        "label": {
+                            "fontFamily": "Material Icons",
+                        },
+                    }
                 },
                 "MuiOutlinedInput": {
-                    "input": {"padding": "10px 10px"},
-                    "inputMarginDense": {
-                        "padding-top": "0px",
-                        "padding-bottom": "0px",
-                    },
+                    "styleOverrides": {
+                        "input": {"padding": "10px 10px"},
+                        "inputMarginDense": {
+                            "paddingTop": "0px",
+                            "paddingBottom": "0px",
+                        },
+                    }
                 },
                 "MuiTab": {
-                    "root": {
-                        "min-width": "90px",
-                        "padding": "2px",
-                        "text-transform": "none",
-                        "@media (min-width:600px)": {
-                            "min-width": "90px",
+                    "styleOverrides": {
+                        "root": {
+                            "minWidth": "90px",
                             "padding": "2px",
-                        },
+                            "textTransform": "none",
+                            "@media (minWidth:600px)": {
+                                "minWidth": "90px",
+                                "padding": "2px",
+                            },
+                        }
                     }
                 },
             },
@@ -660,7 +651,7 @@ class MaterialComponents:
         Path.content.attrs["d"] = "$local.icon"
         Path.content.attrs["fill"] = "transparent"
         Path.content.attrs["stroke"] = "currentColor"
-        SvgIcon.content.style = {"font-size": "25px"}
+        SvgIcon.content.style = {"fontSize": "25px"}
         SvgIcon.addContent(Path)
         ConditionalIcon = TeleportConditional(SvgIcon)
         ConditionalIcon.reference = {
@@ -715,8 +706,8 @@ class MaterialComponents:
             "border": "2px solid #F2F1F1",
             "width": "50px",
             "height": "50px",
-            "border-radius": "50%",
-            "font-size": "25px",
+            "borderRadius": "50%",
+            "fontSize": "25px",
         }
         IconButton.content.events["click"] = [
             # {

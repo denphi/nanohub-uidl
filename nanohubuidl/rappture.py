@@ -37,7 +37,7 @@ class RapptureBuilder:
                 "id": kwargs.get("open", "loader_open"),
             },
         }
-        Loader.content.attrs["disableBackdropClick"] = True
+        #Loader.content.attrs["disableBackdropClick"] = True
         Loader.content.attrs["disableEscapeKeyDown"] = True
         Loader.content.attrs["fullWidth"] = True
         Loader.content.attrs["maxWidth"] = "xs"
@@ -1039,7 +1039,7 @@ class RapptureBuilder:
         NanohubUtils.storageFactory(tp, store_name=cache_store)
         js = ""
         js += "async (component, seq, layout) => {" + eol
-        js += "  var await output_xml = " + store_name + ".getItem('output_xml');" + eol
+        js += "  var output_xml = await " + cache_store + ".getItem('output_xml');" + eol
         js += "  if (!output_xml || output_xml == '')" + eol
         js += "    return;" + eol
         # js += "  console.log(output_xml);" + eol
@@ -1101,7 +1101,7 @@ class RapptureBuilder:
         NanohubUtils.storageFactory(tp, store_name=cache_store)
         js = ""
         js += "async (component, base, seq, layout) => {" + eol
-        js += "  var output_xml = await " + store_name + ".getItem('output_xml');" + eol
+        js += "  var output_xml = await " + cache_store + ".getItem('output_xml');" + eol
         js += "  if (!output_xml || output_xml == '')" + eol
         js += "    return;" + eol
         # js += "  console.log(output_xml);" + eol
@@ -1204,7 +1204,7 @@ class RapptureBuilder:
         NanohubUtils.storageFactory(tp, store_name=cache_store)
         js = ""
         js += "async (component, seq) => {" + eol
-        js += "  var output_xml = await " + store_name + ".getItem('output_xml');" + eol
+        js += "  var output_xml = await " + cache_store + ".getItem('output_xml');" + eol
         js += "  if (!output_xml || output_xml == '')" + eol
         js += "    return;" + eol
         # js += "  console.log(output_xml);" + eol

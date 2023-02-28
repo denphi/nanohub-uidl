@@ -453,9 +453,9 @@ class FormHelper:
         variant = kwargs.get("variant", "outlined")
         select.content.attrs["variant"] = variant
         select.content.attrs["label"] = label
-        select.content.attrs["select"] = True
+        #select.content.attrs["select"] = True
         select.content.attrs["fullWidth"] = True
-        select.content.attrs["helperText"] = description
+        #select.content.attrs["helperText"] = description
         select.content.style = {"margin": "10px 0px 10px 0px"}
         select.content.events["change"] = []
 
@@ -808,7 +808,7 @@ class AppBuilder:
             "open_plot", {"type": "string", "defaultValue": list(results.keys())[0]}
         )
         ToggleButtonGroup = TeleportElement(
-            MaterialLabContent(elementType="ToggleButtonGroup")
+            MaterialContent(elementType="ToggleButtonGroup")
         )
         ToggleButtonGroup.content.style = {
             "width": "100%",
@@ -834,7 +834,7 @@ class AppBuilder:
                 {"type": "stateChange", "modifies": "open_plot", "newState": k}
             )
             ToggleButton = TeleportElement(
-                MaterialLabContent(elementType="ToggleButton")
+                MaterialContent(elementType="ToggleButton")
             )
             ToggleButton.content.attrs["value"] = k
             ToggleButton.content.events["click"] = onClick + v_action + onLoad

@@ -467,10 +467,9 @@ class TeleportProject:
         self.components = {}
         self.ref = uuid.uuid4()
         self.libraries = {
-            "react": "https://unpkg.com/react@16.8.6/umd/react.production.min.js",
-            "react-dom": "https://unpkg.com/react-dom@16.8.6/umd/react-dom.production.min.js",
-            "material-ui": "https://unpkg.com/@material-ui/core@4.12.3/umd/material-ui.production.min.js",
-            "materiallab-ui": "https://unpkg.com/material-ui-lab-umd@4.0.0-alpha.32/material-ui-lab.development.js",
+            "react": "https://unpkg.com/react@18.2.0/umd/react.development.js",
+            "react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js",
+            "material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.development.js",
             "plotlycomponent": "https://unpkg.com/react-plotly.js@2.6.0/dist/create-plotly-component.js",
             "plotly": "https://cdn.plot.ly/plotly-latest.min.js",
             "math": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min.js",
@@ -576,7 +575,7 @@ class TeleportProject:
         react += "requirejs(['react', 'react-dom'], function(React, ReactDOM) {\n"
         react += "  window.React = React\n"
         react += "  let _react = React\n"
-        react += "  requirejs(['material-ui', 'materiallab-ui', 'axios', 'localforage', 'prop-types'], function(Material, MaterialLab, Axios, LocalForage, PropTypes) {\n"
+        react += "  requirejs(['material-ui', 'axios', 'localforage', 'prop-types'], function(Material, Axios, LocalForage, PropTypes) {\n"
         react += "    _react.PropTypes = PropTypes\n"
         react += "    requirejs(['plotlycomponent', 'plotly', 'math', 'number-format'], function(PlotlyComponent, Plotly, math, Format) {\n"
         react += "      window.React = React;\n"
@@ -586,15 +585,16 @@ class TeleportProject:
         react += self.root.buildReact(self.root.name_component)
         for k, v in self.components.items():
             react += v.buildReact(k)
-        react += "      ReactDOM.render(\n"
+        react += "      const container = document.getElementById('root');\n"
+        react += "      const root = ReactDOM.createRoot(container);\n"
+        react += "      root.render(\n"
         react += (
             "          React.createElement("
             + self.root.name_component
             + ", {key:'"
             + str(self.ref)
-            + "'}),\n"
+            + "'})\n"
         )
-        react += "          document.getElementById('root')\n"
         react += "      );\n"
         react += "    });    \n"
         react += "  });    \n"
@@ -620,7 +620,7 @@ class TeleportProject:
                         link += "/uidl/" + filename + "/" +run_uidl + "/" + os.path.relpath(ap, bp)
                         print(link)
                     else:
-                        print("Dont have access to the file")
+                        print(" Dont have access to the file")
                 else:
                     print(filepath + " does not exists")
             else:
@@ -1175,7 +1175,7 @@ class NanohubUtils:
         js += "    }" + eol
         js += "  }" + eol
         js += "  function getItem(name){" + eol
-        js += "    let n = ' " + component + "' + name" + eol
+        js += "    let n = '" + component + "' + name" + eol
         js += "    if (isSupported()) {" + eol
         js += "      return getStorage().getItem(n);" + eol
         js += "    }" + eol
@@ -1194,7 +1194,7 @@ class NanohubUtils:
         js += "  }" + eol
 
         js += "  function removeItem(name){" + eol
-        js += "    let n = ' " + component + "' + name" + eol
+        js += "    let n = '" + component + "' + name" + eol
         js += "    if (isSupported()) {" + eol
         js += "      getStorage().removeItem(n);" + eol
         js += "    } else {" + eol
@@ -1203,7 +1203,7 @@ class NanohubUtils:
         js += "  }" + eol
 
         js += "  function setItem(name, value){" + eol
-        js += "    let n = ' " + component + "' + name" + eol
+        js += "    let n = '" + component + "' + name" + eol
         js += "    if (isSupported()) {" + eol
         js += "      getStorage().setItem(n, value);" + eol
         js += "    } else {" + eol
