@@ -467,9 +467,13 @@ class TeleportProject:
         self.components = {}
         self.ref = uuid.uuid4()
         self.libraries = {
-            "react": "https://unpkg.com/react@18.2.0/umd/react.development.js",
-            "react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js",
-            "material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.development.js",
+            #"react": "https://unpkg.com/react@18.2.0/umd/react.development.js",
+            #"react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js",
+            #"material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.development.js",
+
+            "react": "https://unpkg.com/react@18.2.0/umd/react.production.min.js",
+            "react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js",
+            "material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.production.min.js",
             "plotlycomponent": "https://unpkg.com/react-plotly.js@2.6.0/dist/create-plotly-component.js",
             "plotly": "https://cdn.plot.ly/plotly-latest.min.js",
             "math": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min.js",
@@ -480,6 +484,7 @@ class TeleportProject:
             "require": "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js",
         }
 
+        
     def addComponent(self, name, comp, *args, **kwargs):
         if name not in self.components:
             self.components[name] = comp
@@ -563,8 +568,9 @@ class TeleportProject:
         react += "</script>\n"
         react += "</head>\n"
         react += "  <body style='padding:0;margin:0;height:100%'>\n"
-        react += "    <div id='root' style='height:100%'></div>\n"
+        react += "    <div id='root' class='loader'></div>\n"
         react += "<script type='text/javascript'>\n"
+        react += self.globals.buildReact()
         react += "requirejs.config({\n"
         react += "    waitSeconds: 200,\n"
         react += "    paths: {\n"
@@ -581,7 +587,6 @@ class TeleportProject:
         react += "      window.React = React;\n"
         react += "      const Plot = PlotlyComponent.default(Plotly);\n"
         react += self.globals.customCode["body"].buildReact()
-        react += self.globals.buildReact()
         react += self.root.buildReact(self.root.name_component)
         for k, v in self.components.items():
             react += v.buildReact(k)

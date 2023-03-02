@@ -35,9 +35,11 @@ import email.utils
 import mimetypes
 import posixpath
 import base64
+
 import tempfile
 from PIL import Image
-        
+import PIL
+
 class SubmitLocal:
     def __init__(self, *args, jobspath=None, **kwargs):
         self.basepath = os.getcwd()
@@ -201,6 +203,9 @@ class SubmitLocal:
         squid = ds.getSimToolSquidId()
         jobid = self.searchJobId(squid.replace("/r", "/"))
         if jobid is not None:
+            jobpath = os.path.join(self.jobspath, "_" + str(jobid))
+            with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
+                json.dump(request["outputs"], outfile)
             return self.statusTask(jobid)
         else:
             jobid = random.randint(1, 100000)
@@ -249,14 +254,18 @@ class SubmitLocal:
             req_json = req_json.json()
             if "results" in req_json:
                 if len(req_json["results"]) == 1:
-                    out = {
-                        k.replace("output.", "", 1): v
-                        for k, v in req_json["results"][0].items()
-                    }
-                    out["_id_"] = squid
-                    response["message"] = None
-                    response["outputs"] = out
-                    response["status"] = "INDEXED"
+                    out = {}
+                    complete = True
+                    for o in request["outputs"]:
+                        if o in req_json["results"][0]:
+                            out[o.replace("output.", "", 1)] = req_json["results"][0][o]
+                        else:
+                            complete = False
+                    if complete:
+                        out["_id_"] = squid
+                        response["message"] = None
+                        response["outputs"] = out
+                        response["status"] = "INDEXED"
         except:
             pass
         return response
@@ -271,11 +280,23 @@ class SubmitLocal:
                     dictionary = {}
                     os.chdir(self.basepath)
                     r = Run(simToolLocation, inputs, "_" + str(jobid))
-                    for o in outputs:
+                    all_outputs = r.db.getSavedOutputs()
+                    for o in all_outputs:
                         try:
-                            dictionary[o] = r.read(o)
+                            out = r.read(o)
+                            json.dumps(out)
+                            dictionary[o] = out
                         except:
-                            pass
+                            try:
+                                out = r.read(o)
+                                if isinstance(out, PIL.ImageFile.ImageFile):
+                                    buffered = io.BytesIO()
+                                    out.save(buffered, format=out.format)
+                                    out = "data:image/" + out.format + ";base64," + base64.b64encode(buffered.getvalue()).decode() 
+                                    dictionary[o] = out
+                            except:
+                                print (o + "can not be serialized")
+                                pass
             with open(os.path.join(self.jobspath, "." + str(jobid)), "r") as file:
                 logs = file.read()
                 if "SimTool execution failed" in logs:
@@ -286,6 +307,8 @@ class SubmitLocal:
                         }
                         json.dump(error, outfile)
                 else:
+                    with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
+                        json.dump(outputs, outfile)
                     with open(os.path.join(jobpath, ".results"), "w") as outfile:
                         json.dump(dictionary, outfile)
                     id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
@@ -328,10 +351,18 @@ class SubmitLocal:
                 else:
                     results = os.path.join(jobpath, ".results")
                     if os.path.isfile(results):
-                        out = json.load(open(results, "r"))
-                        out["_id_"] = open(
-                            os.path.join(jobpath, ".squidid"), "r"
-                        ).read()
+                        outputs = os.path.join(jobpath, ".outputs")
+                        if os.path.isfile(outputs):
+                            out = {}
+                            outl = json.load(open(outputs, "r"))
+                            res = json.load(open(results, "r"))
+                            for o in outl:
+                                if o in res:
+                                    out[o] = res[o]
+                            if "_id_" not in out:
+                                out["_id_"] = open(
+                                    os.path.join(jobpath, ".squidid"), "r"
+                                ).read()
                         response["message"] = None
                         response["outputs"] = out
                         response["status"] = "CACHED"

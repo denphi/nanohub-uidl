@@ -500,7 +500,7 @@ class MaterialComponents:
             {
                 "type": "func",
                 "defaultValue": """(props)=>{
-        return (value => {
+        return React.forwardRef((value, ref) => {
             let nprops = {
                 'style':props.style,
                 'className':value.className,
@@ -518,6 +518,7 @@ class MaterialComponents:
                 },
                 'decimalScale':Number.isInteger(props.decimalscale) ? props.decimalscale : undefined,
                 'suffix':"",
+                'getInputRef':ref,
             };
             return React.createElement(Format,nprops);
         });

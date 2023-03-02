@@ -29,75 +29,6 @@ def buildWidget(proj, *args, **kwargs):
     component = re.sub("[^a-zA-Z]+", "", component)
     Project.root.name_component = component
 
-    if kwargs.get("override_styles", True):
-        Project.root.node.content.style = "${'width':'100%','height':'100%'}"
-        Project.globals.assets.append(
-            {"type": "style", "content": "div[role=tooltip] { z-index:100 }"}
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": "li[role=option] { font-size:initial; width:100% }",
-            }
-        )
-        Project.globals.assets.append(
-            {"type": "style", "content": "div.output_subarea {max-width:100%}"}
-        )
-        Project.globals.assets.append(
-            {"type": "style", "content": "div.cell {padding:0px}"}
-        )
-        Project.globals.assets.append(
-            {"type": "style", "content": "#ipython_notebook {display:none}"}
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": "span#login_widget {position: absolute;left: 14px}",
-            }
-        )
-        Project.globals.assets.append(
-            {"type": "style", "content": "body > #header {background-color: #eeee;}"}
-        )
-        Project.globals.assets.append(
-            {"type": "style", "content": ".end_space {display: none}"}
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiIconButton-colorPrimary {  color: rgba(255, 255, 255, 0.87) !important;  background-color: rgba(0, 0, 0, 0.65) !important;}",
-            }
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiIconButton-colorSecondary {  color: rgba(0, 0, 0, 0.87) !important;  background-color: rgba(0, 0, 0, 0.12) !important;}",
-            }
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiFab-primary {  color: rgba(255, 255, 255, 0.87) !important;  background-color: rgba(0, 0, 0, 0.65) !important;}",
-            }
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiFab-secondary {  color: rgba(0, 0, 0, 0.87) !important;  background-color: rgba(0, 0, 0, 0.12) !important;}",
-            }
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiButton-root {padding: 6px 16px !important;text-transform:none !important}",
-            }
-        )
-        Project.globals.assets.append(
-            {
-                "type": "style",
-                "content": ".MuiSwitch-switchBase {position: absolute !important;top: 9px !important;left: 9px !important;}",
-            }
-        )
-
     eol = "\n"
 
     attrs = {}
@@ -503,6 +434,7 @@ def buildWidget(proj, *args, **kwargs):
         js += "          }" + eol
         js += "        }" + eol
     js += "        backbone.app = document.createElement('div');" + eol
+    js += "        backbone.app.className = 'loader';" + eol
     js += "        backbone.app.style.padding = '10px';" + eol
     js += (
         "        const App = React.createElement("
