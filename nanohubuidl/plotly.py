@@ -103,7 +103,7 @@ class PlotlyBuilder:
         ContainerPlot = TeleportElement(MaterialContent(elementType="Paper"))
         ContainerPlot.content.style = {
             "position": "absolute",
-            "height": "calc(100% - 56px)",
+            "height": "100%",
             "width": "100%",
         }
 

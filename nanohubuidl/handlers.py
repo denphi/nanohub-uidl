@@ -87,9 +87,9 @@ class SubmitLocal:
             elements = url.split("/")
             try:
                 pos = elements.index("get")
-                if pos == len(elements) - 2:
+                if pos == len(elements) - 3:
                     obj = self.schemaTask(elements[pos + 1], elements[pos + 2])
-                elif pos == len(elements) - 3:
+                elif pos == len(elements) - 2:
                     obj = self.schemaTask(elements[pos + 1], None)
                 else:
                     obj._content = bytes("Not Found", "utf8")
@@ -124,12 +124,21 @@ class SubmitLocal:
         return obj
 
     def schemaTask(self, tool, revision):
+        tool = tool.replace("%","/")
         obj = Response()
         response = {}
         t = time.time()
         simToolName = tool
         simToolRevision = revision
-        simToolLocation = searchForSimTool(simToolName)
+        if simToolRevision is not None:
+            simToolRevision = "r"+str(simToolRevision)
+        simToolLocation = searchForSimTool(simToolName, simToolRevision)
+        if(simToolLocation["notebookPath"] is None):
+            obj = Response()
+            obj._content = bytes("Tool not Found", "utf8")
+            obj.status_code = 404
+            return obj;
+        
         inputs = getSimToolInputs(simToolLocation)
         outputs = getSimToolOutputs(simToolLocation)
         response["inputs"] = {}
@@ -157,7 +166,7 @@ class SubmitLocal:
             response["state"] = "published"
         else:
             response["state"] = "installed"
-        response["name"] = str(simToolLocation["simToolName"])
+        response["name"] = str(simToolName)
         response["revision"] = str(simToolLocation["simToolRevision"]).replace("r", "")
         response["path"] = simToolLocation["notebookPath"]
         response["type"] = "simtool"
@@ -176,13 +185,26 @@ class SubmitLocal:
         obj = Response()
         response = {}
         t = time.time()
-        simToolName = request["name"]
+        simToolName = request["name"].replace("%","/")
         simToolRevision = request["revision"]
-        simToolLocation = searchForSimTool(simToolName)
-        simToolName = request["name"]
-        simToolRevision = "r" + request["revision"]
+        if simToolRevision is not None:
+            simToolRevision = "r"+str(simToolRevision)
         simToolLocation = searchForSimTool(simToolName, simToolRevision)
+        print(simToolLocation, simToolName, simToolRevision)
+        if(simToolLocation["notebookPath"] is None):
+            obj = Response()
+            obj._content = bytes("Tool not Found", "utf8")
+            obj.status_code = 404
+            return obj;
+        
+        simToolName = request["name"]
+        if request["revision"] == "0":
+            simToolRevision = None
+        else:
+            simToolRevision = "r" + request["revision"]
+
         inputsSchema = getSimToolInputs(simToolLocation)
+        
         for k,v in request["inputs"].items():
             if isinstance(v, str) and v.startswith('base64://'):
                 #if inputsSchema[k].type == "Image":
@@ -311,12 +333,13 @@ class SubmitLocal:
                         json.dump(outputs, outfile)
                     with open(os.path.join(jobpath, ".results"), "w") as outfile:
                         json.dump(dictionary, outfile)
-                    id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
-                    for k in inputs:
-                        v = inputs[k].value
-                        if isinstance(v, str) and ".tmp." in v :
-                            os.unlink(f.name)
-                    self.squidmap[id] = jobid
+                    if os.path.isfile(os.path.join(jobpath, ".squidid")):
+                        id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
+                        for k in inputs:
+                            v = inputs[k].value
+                            if isinstance(v, str) and ".tmp." in v :
+                                os.unlink(f.name)
+                        self.squidmap[id] = jobid
 
         except Exception as e:
             error = {"message": str(e), "code": 500}
@@ -359,10 +382,12 @@ class SubmitLocal:
                             for o in outl:
                                 if o in res:
                                     out[o] = res[o]
+                                    
                             if "_id_" not in out:
-                                out["_id_"] = open(
-                                    os.path.join(jobpath, ".squidid"), "r"
-                                ).read()
+                                if os.path.isfile(os.path.join(jobpath, ".squidid")):
+                                    out["_id_"] = open(
+                                        os.path.join(jobpath, ".squidid"), "r"
+                                    ).read()
                         response["message"] = None
                         response["outputs"] = out
                         response["status"] = "CACHED"
