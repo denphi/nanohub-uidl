@@ -151,14 +151,15 @@ def buildWidget(proj, *args, **kwargs):
     js += "require.config({" + eol
     js += "  paths: {" + eol
     for k, v in Project.libraries.items():
-        if kwargs.get("jupyter_axios", False) == False or k != "axios":
-            js += "    '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
+        if k not in ["require"]:
+            if kwargs.get("jupyter_axios", False) == False or k != "Axios":
+                js += "    '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
     js += "  }" + eol
     js += "});" + eol
     js += "require.undef('" + component + "');" + eol
 
-    js += "define('patchreact', [" + eol
-    js += "    'react'" + eol
+    js += "define('react', [" + eol
+    js += "    'React'" + eol
     js += "  ], function(" + eol
     js += "    React" + eol
     js += "  ){" + eol
@@ -166,14 +167,19 @@ def buildWidget(proj, *args, **kwargs):
     js += "      return React;" + eol
     js += "  }" + eol
     js += ");" + eol
-
+    js += "define('react-dom', [" + eol
+    js += "    'ReactDOM'" + eol
+    js += "  ], function(" + eol
+    js += "    ReactDOM" + eol
+    js += "  ){" + eol
+    js += "      window.ReactDOM = ReactDOM;" + eol
+    js += "      return ReactDOM;" + eol
+    js += "  }" + eol
+    js += ");" + eol
     if kwargs.get("jupyter_axios", False):
-        js += "define('axios', [], function(){" + eol
+        js += "define('Axios', [],function() {" + eol
         js += "  function fixedEncodeURI(str) {" + eol
         js += "    return str.replace(/'/g, \"\\\\'\");" + eol
-        # js += "    return encodeURI(str).replace(/[!'()*]/g, function(c) {" + eol
-        # js += "      return '%' + c.charCodeAt(0).toString(16);" + eol
-        # js += "    });" + eol
         js += "  }" + eol
         js += "  return {" + eol
         js += "    'request' : (url, options) => {" + eol
@@ -246,33 +252,12 @@ def buildWidget(proj, *args, **kwargs):
         js += "  };" + eol
         js += "});" + eol
 
-    js += "define('" + component + "', [" + eol
-    js += "    '@jupyter-widgets/base'," + eol
-    js += "    'underscore', " + eol
-    js += "    'patchreact', " + eol
-    js += "    'react-dom'," + eol
-    js += "    'material-ui'," + eol
-    js += "    'number-format'," + eol
-    js += "    'axios'," + eol
-    js += "    'localforage'," + eol
-    js += "    'prop-types'," + eol
-    js += "    'plotlycomponent'," + eol
-    js += "    'plotly'," + eol
-    js += "    'math'" + eol
-    js += "  ], function(" + eol
-    js += "    widgets, " + eol
-    js += "    _, " + eol
-    js += "    React, " + eol
-    js += "    ReactDOM," + eol
-    js += "    Material," + eol
-    js += "    Format," + eol
-    js += "    Axios," + eol
-    js += "    LocalForage," + eol
-    js += "    PropTypes," + eol
-    js += "    PlotlyComponent," + eol
-    js += "    Plotly," + eol
-    js += "    math" + eol
-    js += "  ) {" + eol
+    libnames = ["'@jupyter-widgets/base'","'underscore'"]
+    libobjects = ["widgets", "_"]
+    libnames = libnames + [json.dumps(k) for k,v in Project.libraries.items() if k not in ["require","React", "ReactDOM"]]
+    libobjects = libobjects + [k for k,v in Project.libraries.items() if k not in ["require","React", "ReactDOM"]]
+    print
+    js += "define('" + component + "', ["+(",".join(libnames))+"], function("+(",".join(libobjects))+") {" + eol
     if kwargs.get("debugger", False):
         js += "        debugger;" + eol
 
@@ -289,7 +274,6 @@ def buildWidget(proj, *args, **kwargs):
     js += "      initialize() {" + eol
 
     js += "        const backbone = this;" + eol
-    # js += "        widgets.DOMWidgetView.prototype.initialize.call(this, {});" + eol #TODO arguments does not exist
     for i in serializers:
         js += (
             "        backbone."

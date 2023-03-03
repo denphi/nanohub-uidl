@@ -467,21 +467,17 @@ class TeleportProject:
         self.components = {}
         self.ref = uuid.uuid4()
         self.libraries = {
-            #"react": "https://unpkg.com/react@18.2.0/umd/react.development.js",
-            #"react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js",
-            #"material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.development.js",
-
-            "react": "https://unpkg.com/react@18.2.0/umd/react.production.min.js",
-            "react-dom": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js",
-            "material-ui": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.production.min.js",
-            "plotlycomponent": "https://unpkg.com/react-plotly.js@2.6.0/dist/create-plotly-component.js",
-            "plotly": "https://cdn.plot.ly/plotly-latest.min.js",
-            "math": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min.js",
-            "axios": "https://unpkg.com/axios/dist/axios.min.js",
-            "localforage": "https://www.unpkg.com/localforage@1.7.3/dist/localforage.min.js",
-            "number-format": "https://unpkg.com/react-number-format@4.3.1/dist/react-number-format.js",
-            "prop-types": "https://unpkg.com/prop-types@15.6/prop-types.min.js",
             "require": "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js",
+            "React": "https://unpkg.com/react@18.2.0/umd/react.production.min.js",
+            "ReactDOM": "https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js",
+            "Material": "https://unpkg.com/@mui/material@5.3.1/umd/material-ui.production.min.js",
+            "PlotlyComponent": "https://unpkg.com/react-plotly.js@2.6.0/dist/create-plotly-component.js",
+            "Plotly": "https://cdn.plot.ly/plotly-latest.min.js",
+            "math": "https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.6.1/math.min.js",
+            "Axios": "https://unpkg.com/axios/dist/axios.min.js",
+            "LocalForage": "https://www.unpkg.com/localforage@1.7.3/dist/localforage.min.js",
+            "Format": "https://unpkg.com/react-number-format@4.3.1/dist/react-number-format.js",
+            "PropTypes": "https://unpkg.com/prop-types@15.6/prop-types.min.js",
         }
 
         
@@ -549,7 +545,6 @@ class TeleportProject:
                     print("already downloaded " + lib)
 
         print("building HTML ")
-
         react = ""
         react += "<!DOCTYPE html>\n"
         react += "<html style='height:100%'>\n"
@@ -558,10 +553,20 @@ class TeleportProject:
         react += "<meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width'/>\n"
         react += "<title>" + self.project_name + "</title>\n"
         react += (
+            "<script crossorigin src='"
+            + libraries["React"][::-1].replace("sj.","",1)[::-1]
+            + ".js'></script>\n"
+        )       
+        react += (
+            "<script crossorigin src='"
+            + libraries["ReactDOM"][::-1].replace("sj.","",1)[::-1]
+            + ".js'></script>\n"
+        )
+        react += (
             "<script src='"
             + libraries["require"][::-1].replace("sj.","",1)[::-1]
             + ".js'></script>\n"
-        )
+        )    
         react += "<link rel='stylesheet' href='https://fonts.googleapis.com/icon?family=Material+Icons'/>\n"
         react += "<script type='text/javascript'>\n"
         react += self.globals.customCode["head"].buildReact() + "\n"
@@ -571,38 +576,39 @@ class TeleportProject:
         react += "    <div id='root' class='loader'></div>\n"
         react += "<script type='text/javascript'>\n"
         react += self.globals.buildReact()
+        react += "define('react', [], function(){ return React });\n"
+        react += "define('react-dom', [], function(){ return ReactDOM });\n"
         react += "requirejs.config({\n"
         react += "    waitSeconds: 200,\n"
         react += "    paths: {\n"
+
         for k, v in libraries.items():
-            react += "        '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
+            if k not in ["require","React","ReactDOM"]:
+                react += "        '" + k + "': '" + v[::-1].replace("sj.","",1)[::-1] + "',\n"
         react += "    }\n"
         react += "});\n"
-        react += "requirejs(['react', 'react-dom'], function(React, ReactDOM) {\n"
-        react += "  window.React = React\n"
-        react += "  let _react = React\n"
-        react += "  requirejs(['material-ui', 'axios', 'localforage', 'prop-types'], function(Material, Axios, LocalForage, PropTypes) {\n"
-        react += "    _react.PropTypes = PropTypes\n"
-        react += "    requirejs(['plotlycomponent', 'plotly', 'math', 'number-format'], function(PlotlyComponent, Plotly, math, Format) {\n"
-        react += "      window.React = React;\n"
-        react += "      const Plot = PlotlyComponent.default(Plotly);\n"
+        react += "window.React = React\n"
+        react += "let _react = React\n"
+        libnames = [json.dumps(k) for k,v in libraries.items() if k not in ["require","React","ReactDOM"]]
+        libobjects = [k for k,v in libraries.items() if k not in ["require","React","ReactDOM"]]
+        react += "requirejs(["+",".join(libnames)+"], function("+",".join(libobjects)+") {\n"
+        #react += "    _react.PropTypes = PropTypes\n"
+        react += "  const Plot = PlotlyComponent.default(Plotly);\n"
         react += self.globals.customCode["body"].buildReact()
         react += self.root.buildReact(self.root.name_component)
         for k, v in self.components.items():
             react += v.buildReact(k)
-        react += "      const container = document.getElementById('root');\n"
-        react += "      const root = ReactDOM.createRoot(container);\n"
-        react += "      root.render(\n"
+        react += "  const container = document.getElementById('root');\n"
+        react += "  const root = ReactDOM.createRoot(container);\n"
+        react += "  root.render(\n"
         react += (
-            "          React.createElement("
+            "        React.createElement("
             + self.root.name_component
             + ", {key:'"
             + str(self.ref)
             + "'})\n"
         )
-        react += "      );\n"
-        react += "    });    \n"
-        react += "  });    \n"
+        react += "  );\n"
         react += "})    \n"
         react += "</script>\n"
         react += "  </body>\n"

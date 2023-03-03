@@ -35,6 +35,7 @@ import email.utils
 import mimetypes
 import posixpath
 import base64
+import traceback
 
 import tempfile
 from PIL import Image
@@ -95,9 +96,11 @@ class SubmitLocal:
                     obj._content = bytes("Not Found", "utf8")
                     obj.status_code = 404
             except Exception as e:
+                traceback.print_exc()
                 obj._content = bytes(str(e), "utf8")
                 obj.status_code = 500
             except:
+                traceback.print_exc()
                 obj._content = bytes("Server Error", "utf8")
                 obj.status_code = 500
         elif "api/results/simtools/run" in url:
@@ -190,7 +193,6 @@ class SubmitLocal:
         if simToolRevision is not None:
             simToolRevision = "r"+str(simToolRevision)
         simToolLocation = searchForSimTool(simToolName, simToolRevision)
-        print(simToolLocation, simToolName, simToolRevision)
         if(simToolLocation["notebookPath"] is None):
             obj = Response()
             obj._content = bytes("Tool not Found", "utf8")
@@ -311,14 +313,25 @@ class SubmitLocal:
                         except:
                             try:
                                 out = r.read(o)
-                                if isinstance(out, PIL.ImageFile.ImageFile):
+                                if isinstance(out, PIL.Image.Image):
                                     buffered = io.BytesIO()
-                                    out.save(buffered, format=out.format)
-                                    out = "data:image/" + out.format + ";base64," + base64.b64encode(buffered.getvalue()).decode() 
+                                    iformat = "PNG"
+                                    imime = "image/png"
+                                    if out.format is not None:
+                                        iformat = out.format
+                                        imime = out.get_format_mimetype()
+                                    out.save(buffered, format=iformat)
+                                    out = "data:" + imime + ";base64," + base64.b64encode(buffered.getvalue()).decode() 
                                     dictionary[o] = out
+                                elif isinstance(out, (bytes, bytearray)):
+                                    print (o, out)
+                                    out = "data:application/octet-stream;base64," + base64.b64encode(out).decode()               
+                                    dictionary[o] = out
+
                             except:
+                                traceback.print_exc()
                                 print (o + "can not be serialized")
-                                pass
+                                    
             with open(os.path.join(self.jobspath, "." + str(jobid)), "r") as file:
                 logs = file.read()
                 if "SimTool execution failed" in logs:
@@ -342,10 +355,12 @@ class SubmitLocal:
                         self.squidmap[id] = jobid
 
         except Exception as e:
+            traceback.print_exc()
             error = {"message": str(e), "code": 500}
             with open(os.path.join(jobpath, ".error"), "w") as outfile:
                 json.dump(error, outfile)
         except:
+            traceback.print_exc()
             error = {"message": "Server Error", "code": 500}
             with open(os.path.join(jobpath, ".error"), "w") as outfile:
                 json.dump(error, outfile)
@@ -407,10 +422,11 @@ class SubmitLocal:
             response["success"] = True
             obj._content = bytes(json.dumps(response), "utf8")
         except Exception as e:
-            print(e)
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes(str(e), "utf8")
         except:
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes("Unknown", "utf8")
         return obj
