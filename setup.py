@@ -42,8 +42,8 @@ setup_args = {
     'data_files'      : [
         ('assets', []),
         (
-            'etc/jupyter/jupyter_server_config.d',
-            ['jupyter-config/jupyter_server_config.d/nanohubuidl.json']
+            'etc/jupyter/jupyter_notebook_config.d',
+            ['nanohubuidl/jupyter-config/jupyter_server_config.d/nanohubuidl.json']
         )
     ],
     'author'          : 'Nanohub',
