@@ -146,6 +146,9 @@ class TeleportElement(TeleportNode):
     def addContent(self, child):
         self.content.children.append(child)
 
+    def insertContent(self, index, child):
+        self.content.children.insert(index, child)
+
     def getNodeTypes(self):
         return self.content.getNodeTypes()
 
@@ -162,7 +165,10 @@ class TeleportConditional(TeleportNode):
 
     def addContent(self, child):
         self.node.addContent(child)
-
+        
+    def insertContent(self, index, child):
+        self.node.insertContent(index, child)
+        
     def buildReact(self, *args, **kwargs):
         value = self.reference
         content = value["content"]
@@ -248,6 +254,9 @@ class TeleportRepeat(TeleportNode):
     def addContent(self, child):
         self.node.addContent(child)
 
+    def insertContent(self, index, child):
+        self.node.insertContent(index, child)
+        
     def buildReact(self, *args, **kwargs):
         reference = self.dataSource
         content = reference["content"]
@@ -790,99 +799,102 @@ class TeleportContent:
         return v
 
     def buildReact(self, *args, **kwargs):
-        react = ""
-        elementType = self.buildElementType()
-        react += (
-            "React.createElement("
-            + elementType
-            + ", {key:"
-            + kwargs.get("nativeRef", "")
-            + "'"
-            + str(self.ref)
-            + "'"
-        )
-        sep = ","
-        for attr, value in self.attrs.items():
-            v = value
-            if isinstance(value, dict):
-                if "type" in value and "content" in value:
-                    content = value["content"]
-                    if value["type"] == "dynamic":
-                        if (
-                            "referenceType" in content
-                            and content["referenceType"] == "state"
-                        ):
-                            v = "self.state." + content["id"] + ""
-                        elif (
-                            "referenceType" in content
-                            and content["referenceType"] == "prop"
-                        ):
-                            v = "self.props." + content["id"] + ""
-                        elif (
-                            "referenceType" in content
-                            and content["referenceType"] == "local"
-                        ):
-                            v = "" + content["id"] + ""
+        try:
+            react = ""
+            elementType = self.buildElementType()
+            react += (
+                "React.createElement("
+                + elementType
+                + ", {key:"
+                + kwargs.get("nativeRef", "")
+                + "'"
+                + str(self.ref)
+                + "'"
+            )
+            sep = ","
+            for attr, value in self.attrs.items():
+                v = value
+                if isinstance(value, dict):
+                    if "type" in value and "content" in value:
+                        content = value["content"]
+                        if value["type"] == "dynamic":
+                            if (
+                                "referenceType" in content
+                                and content["referenceType"] == "state"
+                            ):
+                                v = "self.state." + content["id"] + ""
+                            elif (
+                                "referenceType" in content
+                                and content["referenceType"] == "prop"
+                            ):
+                                v = "self.props." + content["id"] + ""
+                            elif (
+                                "referenceType" in content
+                                and content["referenceType"] == "local"
+                            ):
+                                v = "" + content["id"] + ""
+                    else:
+                        v = str(json.dumps(v))
                 else:
-                    v = str(json.dumps(v))
-            else:
-                if isinstance(v, str) and v.startswith("$"):
-                    v = v.replace("$", "")
+                    if isinstance(v, str) and v.startswith("$"):
+                        v = v.replace("$", "")
+                    else:
+                        v = str(json.dumps(v))
+                react += sep + "'" + attr + "': " + v + ""
+
+            valid_events = {
+                "click": "onClick",
+                "focus": "onFocus",
+                "blur": "onBlur",
+                "change": "onChange",
+                "submit": "onSubmit",
+                "keydown": "onKeyDown",
+                "keyup": "onKeyUp",
+                "keypress": "onKeyPress",
+                "mouseenter": "onMouseEnter",
+                "mouseleave": "onMouseLeave",
+                "mouseover": "onMouseOver",
+                "select": "onSelect",
+                "touchstart": "onTouchStart",
+                "touchend": "onTouchEnd",
+                "scroll": "onScroll",
+                "load": "onLoad",
+            }
+            for ev, list in self.events.items():
+                event_rename = ev
+                if ev in valid_events:
+                    event_rename = valid_events[ev]
+                v = "function(e){"
+                v += "  " + TeleportContent.parseFunctionsList(list) + "\n"
+                v += "}"
+                if v != "function(){}":
+                    react += sep + "'" + event_rename + "': " + v + ""
+            if isinstance(self.style, str) and self.style.startswith("$"):
+                react += sep + "'style': " + self.style.replace("$", "") + ""
+            elif len(self.style) > 0:
+                react += sep + "'style': " + json.dumps(self.style) + ""
+            react += "}"
+
+            if len(self.children) > 0:
+                if len(self.children) == 1:
+                    react += ",\n"
+                    for child in self.children:
+                        react += child.buildReact(nativeRef=kwargs.get("nativeRef", ""))
+                    react += ")\n"
                 else:
-                    v = str(json.dumps(v))
-            react += sep + "'" + attr + "': " + v + ""
-
-        valid_events = {
-            "click": "onClick",
-            "focus": "onFocus",
-            "blur": "onBlur",
-            "change": "onChange",
-            "submit": "onSubmit",
-            "keydown": "onKeyDown",
-            "keyup": "onKeyUp",
-            "keypress": "onKeyPress",
-            "mouseenter": "onMouseEnter",
-            "mouseleave": "onMouseLeave",
-            "mouseover": "onMouseOver",
-            "select": "onSelect",
-            "touchstart": "onTouchStart",
-            "touchend": "onTouchEnd",
-            "scroll": "onScroll",
-            "load": "onLoad",
-        }
-        for ev, list in self.events.items():
-            event_rename = ev
-            if ev in valid_events:
-                event_rename = valid_events[ev]
-            v = "function(e){"
-            v += "  " + TeleportContent.parseFunctionsList(list) + "\n"
-            v += "}"
-            if v != "function(){}":
-                react += sep + "'" + event_rename + "': " + v + ""
-        if isinstance(self.style, str) and self.style.startswith("$"):
-            react += sep + "'style': " + self.style.replace("$", "") + ""
-        elif len(self.style) > 0:
-            react += sep + "'style': " + json.dumps(self.style) + ""
-        react += "}"
-
-        if len(self.children) > 0:
-            if len(self.children) == 1:
-                react += ",\n"
-                for child in self.children:
-                    react += child.buildReact(nativeRef=kwargs.get("nativeRef", ""))
-                react += ")\n"
+                    react += ",[\n"
+                    sep = ""
+                    for child in self.children:
+                        react += sep + child.buildReact(
+                            nativeRef=kwargs.get("nativeRef", "")
+                        )
+                        sep = " ,"
+                    react += "])"
             else:
-                react += ",[\n"
-                sep = ""
-                for child in self.children:
-                    react += sep + child.buildReact(
-                        nativeRef=kwargs.get("nativeRef", "")
-                    )
-                    sep = " ,"
-                react += "])"
-        else:
-            react += ")"
-
+                react += ")"
+        except Exception as e:
+            print (self.elementType)
+            raise e
         return react
 
 
