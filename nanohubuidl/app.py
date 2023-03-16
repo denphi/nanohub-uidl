@@ -1,6 +1,5 @@
 from .teleport import *
 from .rappture import *
-from .simtool import *
 from .material import *
 import numpy as np
 import json

@@ -1,5 +1,4 @@
 """API handlers for the Jupyter Server example."""
-from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.extension.handler import ExtensionHandlerJinjaMixin, ExtensionHandlerMixin
 from jupyter_server.utils import url_escape
 from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
@@ -127,7 +126,7 @@ class SubmitLocal:
         return obj
 
     def schemaTask(self, tool, revision):
-        tool = tool.replace("%","/")
+        tool = tool.replace("+","/")
         obj = Response()
         response = {}
         t = time.time()
@@ -188,11 +187,12 @@ class SubmitLocal:
         obj = Response()
         response = {}
         t = time.time()
-        simToolName = request["name"].replace("%","/")
+        simToolName = request["name"].replace("+","/")
         simToolRevision = request["revision"]
         if simToolRevision is not None:
             simToolRevision = "r"+str(simToolRevision)
         simToolLocation = searchForSimTool(simToolName, simToolRevision)
+        print(simToolLocation)
         if(simToolLocation["notebookPath"] is None):
             obj = Response()
             obj._content = bytes("Tool not Found", "utf8")
@@ -221,11 +221,15 @@ class SubmitLocal:
         inputs = getParamsFromDictionary(inputsSchema, request["inputs"])
         hashableInputs = _get_inputs_cache_dict(inputs)
         response["userinputs"] = _get_inputs_dict(inputs)
-        ds = simtool.datastore.WSDataStore(
-            simToolName, simToolRevision, hashableInputs, self.squiddb
-        )
-        squid = ds.getSimToolSquidId()
-        jobid = self.searchJobId(squid.replace("/r", "/"))
+        try:
+            ds = simtool.datastore.WSDataStore(
+                simToolName, simToolRevision, hashableInputs, self.squiddb
+            )
+            squid = ds.getSimToolSquidId()
+            jobid = self.searchJobId(squid.replace("/r", "/"))
+        except:
+            jobid = None
+            
         if jobid is not None:
             jobpath = os.path.join(self.jobspath, "_" + str(jobid))
             with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
