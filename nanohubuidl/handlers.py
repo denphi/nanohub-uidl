@@ -520,8 +520,6 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                 </body>
             </html>"""
         )
-
-        print(path)
         
         if os.path.exists(UIDLRequestHandler.filename) is False:
             status = HTTPStatus(404)
