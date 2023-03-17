@@ -285,9 +285,12 @@ class SubmitLocal:
                     out = {}
                     complete = True
                     for o in request["outputs"]:
-                        if o in req_json["results"][0]:
-                            out[o.replace("output.", "", 1)] = req_json["results"][0][o]
+                        if "output." + o in req_json["results"][0]:
+                            out[o] = req_json["results"][0]["output." + o]
+                        elif o in req_json["results"][0]:
+                            out[o.replace("output.","",1)] = req_json["results"][0][o]
                         else:
+                            print(o)
                             complete = False
                     if complete:
                         out["_id_"] = squid
@@ -517,6 +520,8 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                 </body>
             </html>"""
         )
+
+        print(path)
         
         if os.path.exists(UIDLRequestHandler.filename) is False:
             status = HTTPStatus(404)
