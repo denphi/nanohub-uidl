@@ -729,31 +729,32 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
     
 def UIDLLocalHandlerSettings():
     settings = {}
-    fn = os.path.join(os.environ["SESSIONDIR"], "resources")
-    with open(fn, "r") as f:
-        res = f.read()
-    for line in res.split("\n"):
-        if line.startswith("hub_url"):
-            settings['hub_url'] = line.split()[1]
-        elif line.startswith("sessionid"):
-            settings['session'] = int(line.split()[1])
-        elif line.startswith("application_name"):
-            settings['app'] = line.split(" ", 1)[1]
-        elif line.startswith("session_token"):
-            settings['token'] = line.split()[1]
-        elif line.startswith("filexfer_cookie"):
-            settings['cookie'] = line.split()[1]
-        elif line.startswith("filexfer_port"):
-            settings['cookieport'] = line.split()[1]
-    settings['path'] = (
-        "/weber/"
-        + str(settings['session'])
-        + "/"
-        + str(settings['cookie'])
-        + "/"
-        + str(int(settings['cookieport']) % 1000)
-        + "/"
-    )
+    if "SESSIONDIR" in os.environ:
+        fn = os.path.join(os.environ["SESSIONDIR"], "resources")
+        with open(fn, "r") as f:
+            res = f.read()
+        for line in res.split("\n"):
+            if line.startswith("hub_url"):
+                settings['hub_url'] = line.split()[1]
+            elif line.startswith("sessionid"):
+                settings['session'] = int(line.split()[1])
+            elif line.startswith("application_name"):
+                settings['app'] = line.split(" ", 1)[1]
+            elif line.startswith("session_token"):
+                settings['token'] = line.split()[1]
+            elif line.startswith("filexfer_cookie"):
+                settings['cookie'] = line.split()[1]
+            elif line.startswith("filexfer_port"):
+                settings['cookieport'] = line.split()[1]
+        settings['path'] = (
+            "/weber/"
+            + str(settings['session'])
+            + "/"
+            + str(settings['cookie'])
+            + "/"
+            + str(int(settings['cookieport']) % 1000)
+            + "/"
+        )
     return settings
 
 class UIDLHandler(IPythonHandler):
