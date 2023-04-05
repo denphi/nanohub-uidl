@@ -498,7 +498,7 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
     local = False
 
     def __init__(self, *args, directory=None, **kwargs):
-        submit = SubmitLocal()
+        self.submit = SubmitLocal()
         if directory is None:
             directory = os.getcwd()
         self.directory = directory

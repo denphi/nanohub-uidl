@@ -64,34 +64,40 @@ _load_jupyter_server_extension = load_jupyter_server_extension
 
 
 def parse_cmd_line():
-    hub_url = ""
-    app = ""
-    sessionid = ""
-    fn = os.path.join(os.environ["SESSIONDIR"], "resources")
-    with open(fn, "r") as f:
-        res = f.read()
-    for line in res.split("\n"):
-        if line.startswith("hub_url"):
-            hub_url = line.split()[1]
-        elif line.startswith("sessionid"):
-            sessionid = int(line.split()[1])
-        elif line.startswith("application_name"):
-            app = line.split(" ", 1)[1]
-        elif line.startswith("session_token"):
-            token = line.split()[1]
-        elif line.startswith("filexfer_cookie"):
-            cookie = line.split()[1]
-        elif line.startswith("filexfer_port"):
-            cookieport = line.split()[1]
-    path = (
-        "/weber/"
-        + str(sessionid)
-        + "/"
-        + cookie
-        + "/"
-        + str(int(cookieport) % 1000)
-        + "/"
-    )
+    if "SESSIONDIR" in os.environ:
+        sessiondir = os.environ["SESSIONDIR"]
+        fn = os.path.join(os.environ["SESSIONDIR"], "resources")
+        with open(fn, "r") as f:
+            res = f.read()
+        for line in res.split("\n"):
+            if line.startswith("hub_url"):
+                hub_url = line.split()[1]
+            elif line.startswith("sessionid"):
+                sessionid = int(line.split()[1])
+            elif line.startswith("application_name"):
+                app = line.split(" ", 1)[1]
+            elif line.startswith("session_token"):
+                token = line.split()[1]
+            elif line.startswith("filexfer_cookie"):
+                cookie = line.split()[1]
+            elif line.startswith("filexfer_port"):
+                cookieport = line.split()[1]
+        path = (
+            "/weber/"
+            + str(sessionid)
+            + "/"
+            + cookie
+            + "/"
+            + str(int(cookieport) % 1000)
+            + "/"
+        )
+    else:
+        sessiondir = "/"
+        hub_url = "https://nanohub.org"
+        path = "/"
+        sessionid = 0
+        token = "000"
+        app = ""
     parser = argparse.ArgumentParser(
         usage="""usage: [-h] [--host] [--port] [--hub] [--session] [--app] [--token] [name]
 Start a Jupyter notebook-based tool
@@ -101,12 +107,13 @@ optional arguments:
   -h, --help  show this help message and exit.
   --host set hostname.
   --port set running port.
-  --hub set running port.
-  --session set running port.
-  --app set running port.
+  --hub set hub name.
+  --session set session id.
+  --local run local API handler.
+  --app set app name.
   --dir set folder to start.
 """,
-        prog="start_server",
+        prog="run_uidl",
         add_help=False,
     )
     parser.add_argument("-h", "--help", dest="help", action="store_true")
@@ -125,13 +132,12 @@ optional arguments:
         "-l", "--local", dest="local", action="store_true", default=False
     )
     parser.add_argument(
-        "-d", "--dir", dest="dir", action="store", default=os.environ["SESSIONDIR"]
+        "-d", "--dir", dest="dir", action="store", default=sessiondir
     )
     parser.add_argument("name")
     return parser
 
 def main():
-
     if os.getuid() == 0:
         print("Do not run this as root.", file=sys.stderr)
         sys.exit(1)
