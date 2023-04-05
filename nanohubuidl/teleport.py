@@ -5,7 +5,7 @@ import uuid, weakref, os
 from IPython.display import HTML, Javascript, display
 import re
 import warnings
-
+import psutil
 
 class TeleportCustomCode:
     def __init__(self, *args, **kwargs):
@@ -633,14 +633,15 @@ class TeleportProject:
         if run_uidl in ["local", "redirect", "direct"]:
             if jupyter_notebook_url is not None:
                 if os.path.exists(filename):
-                    bp = os.readlink('/proc/%s/cwd' % os.environ['JPY_PARENT_PID'])
-                    ap = os.path.abspath(filename)
-                    if ap.startswith(bp):
-                        link = "/".join(jupyter_notebook_url.split("/", 8)[:7])
-                        link += "/uidl/" + filename + "/" +run_uidl + "/" + os.path.relpath(ap, bp)
-                        print(link)
-                    else:
-                        print(" Dont have access to the file")
+                        p = psutil.Process(int(os.environ['JPY_PARENT_PID']))
+                        bp = os.path.abspath(p.cwd())
+                        ap = os.path.abspath(filename)
+                        if ap.startswith(bp):
+                            link = "/".join(jupyter_notebook_url.split("/", 8)[:7])
+                            link += "/uidl/" + filename + "/" +run_uidl + "/" + os.path.relpath(ap, bp)
+                            print(link)
+                        else:
+                            print(" Dont have access to the file")
                 else:
                     print(filepath + " does not exists")
             else:
@@ -1171,6 +1172,23 @@ class NanohubUtils:
         js += "  }" + eol
         js += "  return undefined;" + eol
         js += "}" + eol
+
+        js += "function getCookie(cname) {" + eol
+        js += "  let name = cname + '=';" + eol
+        js += "  let decodedCookie = decodeURIComponent(document.cookie);" + eol
+        js += "  let ca = decodedCookie.split(';');" + eol
+        js += "  for(let i = 0; i <ca.length; i++) {" + eol
+        js += "    let c = ca[i];" + eol
+        js += "    while (c.charAt(0) == ' ') {" + eol
+        js += "      c = c.substring(1);" + eol
+        js += "    }" + eol
+        js += "    if (c.indexOf(name) == 0) {" + eol
+        js += "      return c.substring(name.length, c.length);" + eol
+        js += "   }" + eol
+        js += " }" + eol
+        js += " return '';" + eol
+        js += "}" + eol
+
         js += "function " + method_name + " (getStorage){" + eol
         js += "  /* ISC License (ISC). Copyright 2017 Michal Zalecki */" + eol
         js += "  let inMemoryStorage = {};" + eol

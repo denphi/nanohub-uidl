@@ -40,7 +40,14 @@ import tempfile
 from PIL import Image
 import PIL
 
-class SubmitLocal:
+class Singleton(object):
+    _instance = None
+    def __new__(class_, *args, **kwargs):
+        if not isinstance(class_._instance, class_):
+            class_._instance = object.__new__(class_, *args, **kwargs)
+        return class_._instance
+
+class SubmitLocal(Singleton):
     def __init__(self, *args, jobspath=None, **kwargs):
         self.basepath = os.getcwd()
         if "RESULTSDIR" in os.environ:
@@ -245,6 +252,9 @@ class SubmitLocal:
                     created = False
                 else:
                     created = True
+            with open(os.path.join(self.jobspath, "." + str(jobid)), "w") as f:
+                f.write("Setting up Sim2L")
+                
             thread = Process(
                 target=SubmitLocal.runJob,
                 args=(self, jobid, simToolLocation, inputs, request["outputs"]),
@@ -305,7 +315,7 @@ class SubmitLocal:
         try:
             jobpath = os.path.join(self.jobspath, "_" + str(jobid))
             with open(
-                os.path.join(self.jobspath, "." + str(jobid)), "w", buffering=1
+                os.path.join(self.jobspath, "." + str(jobid)), "a", buffering=1
             ) as sys.stdout:
                 with sys.stdout as sys.stderr:
                     dictionary = {}
@@ -380,6 +390,7 @@ class SubmitLocal:
             response = {}
             response["id"] = jobid
             t = time.time()
+            jobidpath = os.path.join(self.jobspath, "." + str(jobid))
             jobpath = os.path.join(self.jobspath, "_" + str(jobid))
             if os.path.exists(jobpath):
                 response["status"] = "RUNNING"
@@ -413,13 +424,19 @@ class SubmitLocal:
                         response["message"] = None
                         response["outputs"] = out
                         response["status"] = "CACHED"
-                    else:
-                        jobidpath = os.path.join(self.jobspath, "." + str(jobid))
+                    elif os.path.exists(jobidpath):
                         with open(jobidpath, "r") as log:
                             response["message"] = self.lastSim2lLog(
                                 log, response["status"]
                             )
                             response["status"] = response["message"]
+            elif os.path.exists(jobidpath):
+                response["status"] = "STAGGING"
+                with open(jobidpath, "r") as log:
+                    response["message"] = self.lastSim2lLog(
+                        log, response["status"]
+                    )
+                    response["status"] = response["message"]
             else:
                 response["message"] = ""
                 response["status"] = "NOT FOUND"
@@ -451,8 +468,11 @@ class SubmitLocal:
         obj = Response()
         obj.status_code = 200
         try:
+            sessionid = "0";
+            if "sessionid" in os.environ:
+                sessionid = os.environ["sessionid"]
             response = {
-                "access_token": "session" + os.environ["sessionid"],
+                "access_token": "session" + str(sessionid),
                 "expires_in": 3600,
                 "token_type": "Bearer",
                 "scope": None,
@@ -476,9 +496,9 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
     token = ""
     path = ""
     local = False
-    submit = SubmitLocal()
 
     def __init__(self, *args, directory=None, **kwargs):
+        submit = SubmitLocal()
         if directory is None:
             directory = os.getcwd()
         self.directory = directory
@@ -532,7 +552,7 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                 "url = '" + UIDLRequestHandler.hub_url + "/api/",
                 "url = '" + UIDLRequestHandler.path + "api/",
             )
-
+            
             ticket = (
                 UIDLRequestHandler.hub_url
                 + "/feedback/report_problems?group=app-"
@@ -599,7 +619,7 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                     except:
                         data = dict(parse_qsl(field_data))
                 if UIDLRequestHandler.local:
-                    res = UIDLRequestHandler.submit.handle(url, data)
+                    res = self.submit.handle(url, data)
                 else:
                     if method == "post":
                         res = requests.post(
@@ -755,6 +775,13 @@ def UIDLLocalHandlerSettings():
             + str(int(settings['cookieport']) % 1000)
             + "/"
         )
+    else:
+        settings['hub_url'] = "https://nanohub.org"
+        settings['path'] = "/"
+        settings['session'] = 0
+        settings['token'] = "000"
+        settings['app'] = ""
+
     return settings
 
 class UIDLHandler(IPythonHandler):
@@ -776,6 +803,11 @@ class UIDLHandler(IPythonHandler):
                 "url = '" + UIDLHandler._settings['path'] + "uidl/" + basefile + "/" + method + "/api/",
             )
 
+        text = text.replace(
+            "Axios.request(url,",
+            "Axios.request(url + '?_xsrf=' + getCookie('_xsrf'),",
+        )
+        
         ticket = (
             str(UIDLHandler._settings['hub_url'])
             + "/feedback/report_problems?group=app-"
@@ -828,9 +860,7 @@ class UIDLHandler(IPythonHandler):
         path = args[1]
         return FilesRedirectHandler.redirect_to_files(self, path)
 
-class UIDLLocalHandler(UIDLHandler):
-    submit = SubmitLocal()
-  
+class UIDLLocalHandler(UIDLHandler):  
     @tornado.web.authenticated
     def post(self, *args, **kwargs):
         self.log.info('UIDLLocalHandler gets (POST): %s -  %s', args[0], args[1])
@@ -838,6 +868,8 @@ class UIDLLocalHandler(UIDLHandler):
         
     @tornado.web.authenticated
     def get(self, *args, **kwargs):
+        submit = SubmitLocal()
+
         self.log.info('UIDLLocalHandler gets (GET): %s -  %s', args[0], args[1])
         basefile = args[0]
         path = args[1]
@@ -848,7 +880,7 @@ class UIDLLocalHandler(UIDLHandler):
             self.finish(text)
         elif path.startswith("api/"):
             try:
-                res = UIDLLocalHandler.submit.handle(path, self.filter_data())
+                res = submit.handle(path, self.filter_data())
                 status = HTTPStatus(res.status_code)
                 self.set_status(res.status_code)
                 self.finish(res.text)

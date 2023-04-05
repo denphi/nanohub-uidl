@@ -130,7 +130,6 @@ optional arguments:
     parser.add_argument("name")
     return parser
 
-
 def main():
 
     if os.getuid() == 0:
