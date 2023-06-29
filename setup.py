@@ -7,13 +7,33 @@
 from __future__ import print_function
 from glob import glob
 from os.path import join as pjoin
+import os
+import io
+HERE = os.path.abspath(os.path.dirname(__file__))
 
+def find_packages(top=HERE):
+    """
+    Find all of the packages.
+    """
+    packages = []
+    for d, dirs, _ in os.walk(top, followlinks=True):
+        if os.path.exists(pjoin(d, '__init__.py')):
+            packages.append(os.path.relpath(d, top).replace(os.path.sep, '.'))
+        elif d != top:
+            # Don't look for packages in subfolders if current isn't a package.
+            dirs[:] = []
+    return packages
 
-from setupbase import (
-    create_cmdclass, install_npm, ensure_targets,
-    find_packages, combine_commands, ensure_python,
-    get_version, HERE
-)
+def get_version(file, name='__version__'):
+    """Get the version of the package from the given file by
+    executing it and extracting the given `name`.
+    """
+    path = os.path.realpath(file)
+    version_ns = {}
+    with io.open(path, encoding="utf8") as f:
+        exec(f.read(), {}, version_ns)
+    return version_ns[name]
+
 
 from setuptools import setup
 
@@ -21,8 +41,8 @@ from setuptools import setup
 # The name of the project
 name = 'nanohub-uidl'
 
-# Ensure a valid python version
-ensure_python('>=3.3')
+# Ensure a valid python version ### deprecated
+#ensure_python('>=3.3')
 
 # Get our version
 version = get_version(pjoin('nanohubuidl', '_version.py'))
