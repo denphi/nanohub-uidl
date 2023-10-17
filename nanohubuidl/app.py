@@ -746,14 +746,18 @@ class FormHelper:
 
     def ConditionalGroup(component, elements, state, conditions, *args, **kwargs):
         lstate = state.split(".")
+        ltype = "state"
         if component.stateDefinitions.get(lstate[0], None) is None:
-            raise Exception("Not existing state ('" + state + "')")
+            ltype = "prop"
+            if component.propDefinitions.get(lstate[0], None) is None:
+                raise Exception("Not existing reference ('" + state + "')")
+
         Paper = MaterialContent(elementType="Paper")
         Paper.style = {"width": "100%"}
         container = TeleportConditional(Paper)
         container.reference = {
             "type": "dynamic",
-            "content": {"referenceType": "state", "id": state},
+            "content": {"referenceType": ltype, "id": state},
         }
         container.conditions = conditions
         for element in elements:
