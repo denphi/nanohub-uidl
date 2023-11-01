@@ -40,8 +40,6 @@ import tempfile
 from PIL import Image
 import PIL
 
-from filelock import FileLock
-
 class Singleton(object):
     _instance = None
     def __new__(class_, *args, **kwargs):
@@ -361,13 +359,10 @@ class SubmitLocal(Singleton):
                         }
                         json.dump(error, outfile)
                 else:
-                    lock = FileLock(os.path.join(jobpath, ".lock") + ".")
-                    with lock:
-                        with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
-                            json.dump(outputs, outfile)
-                    with lock:
-                        with open(os.path.join(jobpath, ".results"), "w") as outfile:
-                            json.dump(dictionary, outfile)
+                    with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
+                        json.dump(outputs, outfile)
+                    with open(os.path.join(jobpath, ".results"), "w") as outfile:
+                        json.dump(dictionary, outfile)
                     if os.path.isfile(os.path.join(jobpath, ".squidid")):
                         id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
                         for k in inputs:
@@ -375,6 +370,8 @@ class SubmitLocal(Singleton):
                             if isinstance(v, str) and ".tmp." in v :
                                 os.unlink(f.name)
                         self.squidmap[id] = jobid
+                    with open(os.path.join(jobpath, ".done"), "w") as outfile:
+                        json.dump("done", outfile)
 
         except Exception as e:
             traceback.print_exc()
@@ -410,8 +407,9 @@ class SubmitLocal(Singleton):
                     response["status"] = "ERROR"
                     obj.status_code = er["code"]
                 else:
+                    done = os.path.join(jobpath, ".done")
                     results = os.path.join(jobpath, ".results")
-                    if os.path.isfile(results):
+                    if os.path.isfile(done) and os.path.isfile(results):
                         outputs = os.path.join(jobpath, ".outputs")
                         if os.path.isfile(outputs):
                             out = {}
