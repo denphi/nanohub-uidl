@@ -40,6 +40,8 @@ import tempfile
 from PIL import Image
 import PIL
 
+from filelock import FileLock
+
 class Singleton(object):
     _instance = None
     def __new__(class_, *args, **kwargs):
@@ -359,10 +361,13 @@ class SubmitLocal(Singleton):
                         }
                         json.dump(error, outfile)
                 else:
-                    with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
-                        json.dump(outputs, outfile)
-                    with open(os.path.join(jobpath, ".results"), "w") as outfile:
-                        json.dump(dictionary, outfile)
+                    lock = FileLock(os.path.join(jobpath, ".lock") + ".")
+                    with lock:
+                        with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
+                            json.dump(outputs, outfile)
+                    with lock:
+                        with open(os.path.join(jobpath, ".results"), "w") as outfile:
+                            json.dump(dictionary, outfile)
                     if os.path.isfile(os.path.join(jobpath, ".squidid")):
                         id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
                         for k in inputs:
