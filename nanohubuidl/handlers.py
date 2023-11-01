@@ -363,6 +363,8 @@ class SubmitLocal(Singleton):
                         json.dump(outputs, outfile)
                     with open(os.path.join(jobpath, ".results"), "w") as outfile:
                         json.dump(dictionary, outfile)
+                    with open(os.path.join(jobpath, ".done"), "w") as outfile:
+                        json.dump("done", outfile)
                     if os.path.isfile(os.path.join(jobpath, ".squidid")):
                         id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
                         for k in inputs:
@@ -370,8 +372,6 @@ class SubmitLocal(Singleton):
                             if isinstance(v, str) and ".tmp." in v :
                                 os.unlink(f.name)
                         self.squidmap[id] = jobid
-                    with open(os.path.join(jobpath, ".done"), "w") as outfile:
-                        json.dump("done", outfile)
 
         except Exception as e:
             traceback.print_exc()
