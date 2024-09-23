@@ -562,13 +562,22 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                 + UIDLRequestHandler.app.replace('"', "").replace(" ", "_")
             )
 
+            appl = (
+                UIDLRequestHandler.hub_url
+                + "/tools/"
+                + UIDLRequestHandler.app.replace('"', "")
+            )           
+
             header = (
                 '<div style="position: fixed;z-index: 1000000;top: 0px;right: 170px;"><button title="Report a problem" onclick="window.open(\''
                 + ticket
-                + '\')" style="color: #333;padding: 7px 15px;border: 0px;">Submit a ticket</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\''
+                + '\')" style="color: #333;padding: 7px 15px;border: 0px;">Submit a ticket</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Go Back to Tool Page, Keep session for later" onclick="window.location.href=\''
+                + appl
+                + '\'" style="color: #333;padding: 7px 15px;border: 0px;">Keep for later</button>&nbsp;&nbsp;<button class="btn btn-sm navbar-btn" title="Terminate this notebook or tool and any others in the session" onclick="window.location.href=\''
                 + close
                 + '\'" style="color: #333;padding: 7px 15px;border: 0px;">Terminate Session</button></div>'
             )
+            
             res = re.search("<body(?:\"[^\"]*\"['\"]*|'[^']*'['\"]*|[^'\">])+>", text)
             if res is not None:
                 index = res.end() + 1
