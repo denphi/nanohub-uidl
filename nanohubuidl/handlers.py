@@ -123,9 +123,11 @@ class SubmitLocal(Singleton):
                     obj._content = bytes("Not Found", "utf8")
                     obj.status_code = 404
             except Exception as e:
+                traceback.print_exc()
                 obj._content = bytes(str(e), "utf8")
                 obj.status_code = 500
             except:
+                traceback.print_exc()
                 obj._content = bytes("Server Error", "utf8")
                 obj.status_code = 500
         else:
@@ -492,9 +494,11 @@ class SubmitLocal(Singleton):
             }
             obj._content = bytes(json.dumps(response), "utf8")
         except Exception as e:
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes(str(e), "utf8")
         except:
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes("Unknown", "utf8")
 
