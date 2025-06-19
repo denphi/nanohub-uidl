@@ -27,6 +27,8 @@ from simtool.utils import (
     _get_inputs_cache_dict,
     getParamsFromDictionary,
 )
+from packaging import version
+
 import simtool
 import sys
 import http.client
@@ -121,9 +123,11 @@ class SubmitLocal(Singleton):
                     obj._content = bytes("Not Found", "utf8")
                     obj.status_code = 404
             except Exception as e:
+                traceback.print_exc()
                 obj._content = bytes(str(e), "utf8")
                 obj.status_code = 500
             except:
+                traceback.print_exc()
                 obj._content = bytes("Server Error", "utf8")
                 obj.status_code = 500
         else:
@@ -229,9 +233,16 @@ class SubmitLocal(Singleton):
         hashableInputs = _get_inputs_cache_dict(inputs)
         response["userinputs"] = _get_inputs_dict(inputs)
         try:
-            ds = simtool.datastore.WSDataStore(
-                simToolName, simToolRevision, hashableInputs, self.squiddb
-            )
+            squid = None
+            if version.parse(simtool.__version__) >= version.parse("0.4.4"):
+                ds = simtool.datastore.WSDataStore(
+                    simToolName, simToolRevision, self.squiddb, hashableInputs
+                )
+            else :
+                # DEPRECATED
+                ds = simtool.datastore.WSDataStore(
+                    simToolName, simToolRevision, hashableInputs, self.squiddb
+                )
             squid = ds.getSimToolSquidId()
             jobid = self.searchJobId(squid.replace("/r", "/"))
         except:
@@ -263,7 +274,8 @@ class SubmitLocal(Singleton):
             response["message"] = ""
             response["status"] = "QUEUED"
             response["id"] = jobid
-            response = self.checkResultsDB(squid, request, response)
+            if squid is not None:
+                response = self.checkResultsDB(squid, request, response)
             response["response_time"] = time.time() - t
             response["success"] = True
             obj.status_code = 200
@@ -482,9 +494,11 @@ class SubmitLocal(Singleton):
             }
             obj._content = bytes(json.dumps(response), "utf8")
         except Exception as e:
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes(str(e), "utf8")
         except:
+            traceback.print_exc()
             obj.status_code = 500
             obj._content = bytes("Unknown", "utf8")
 
