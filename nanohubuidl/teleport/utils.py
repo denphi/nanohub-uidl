@@ -237,6 +237,7 @@ class NanohubUtils:
         return [{"type": "propCall", "calls": method_name, "args": []}]
 
     def storageFactory(tp, *args, **kwargs):
+
         method_name = kwargs.get("method_name", "storageFactory")
         storage_name = kwargs.get("storage_name", "window.sessionStorage")
         store_name = kwargs.get("store_name", "sessionStore")
@@ -339,6 +340,14 @@ class NanohubUtils:
         js += "    }" + eol
         js += "  }" + eol
 
+        js += "  function keys(){" + eol
+        js += "    if (isSupported()) {" + eol
+        js += "      return getStorage().keys();" + eol
+        js += "    } else {" + eol
+        js += "      return Object.keys(inMemoryStorage) || [];" + eol
+        js += "    }" + eol
+        js += "  }" + eol
+
         js += "  function removeItem(name){" + eol
         js += "    let n = '" + component + "' + name" + eol
         js += "    if (isSupported()) {" + eol
@@ -371,6 +380,7 @@ class NanohubUtils:
         js += "    removeItem," + eol
         js += "    clear," + eol
         js += "    key," + eol
+        js += "    keys," + eol
         js += "    get length() {" + eol
         js += "      return length();" + eol
         js += "    }," + eol
