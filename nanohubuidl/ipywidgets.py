@@ -475,9 +475,9 @@ def buildWidget(proj, *args, **kwargs):
         
         # Build import statements for libraries
         imports = []
-        # Use esm.sh for base widgets and underscore for better dependency handling
-        imports.append('import * as widgets from "https://esm.sh/@jupyter-widgets/base@6";')
-        imports.append('import _ from "https://esm.sh/underscore@1.13.6";')
+        # Use jsdelivr for base widgets and underscore (esm.sh caused "class heritage" errors)
+        imports.append('import * as widgets from "https://cdn.jsdelivr.net/npm/@jupyter-widgets/base@6/+esm";')
+        imports.append('import _ from "https://cdn.jsdelivr.net/npm/underscore@1.13.6/+esm";')
         
         # Add other library imports - use CDN URLs for ESM
         for lib_name in libraries.keys():
