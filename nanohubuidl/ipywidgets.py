@@ -539,7 +539,8 @@ def buildWidget(proj, *args, **kwargs):
         
         # Remove define() wrapper
         # Regex to match define('name', ['deps'], function(deps) { ... })
-        define_pattern = r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{"
+        # We need to capture the body inside the function
+        define_pattern = r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{(.*)\}\s*\);"
         
         match = re.search(define_pattern, module_body, flags=re.DOTALL)
         
