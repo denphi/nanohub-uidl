@@ -483,9 +483,33 @@ def buildWidget(proj, *args, **kwargs):
         for lib_name in libraries.keys():
             if lib_name not in ["require", "React", "ReactDOM"]:
                 lib_url = libraries[lib_name]
-                # Convert .js URLs to work with ESM
-                if not lib_url.endswith('.js'):
+                
+                # Try to convert unpkg/cdnjs URLs to ESM-friendly esm.sh URLs
+                # This fixes "does not provide an export named 'default'" errors
+                if "unpkg.com" in lib_url:
+                    # Extract package name and version
+                    # Matches: unpkg.com/package@version/... or unpkg.com/package/...
+                    match = re.search(r"unpkg\.com/(@?[^@/]+)(?:@([^/]+))?", lib_url)
+                    if match:
+                        pkg = match.group(1)
+                        ver = match.group(2)
+                        lib_url = f"https://esm.sh/{pkg}"
+                        if ver:
+                            lib_url += f"@{ver}"
+                
+                elif "cdnjs.cloudflare.com" in lib_url:
+                    # Extract package name
+                    # Matches: cdnjs.../ajax/libs/package/version/...
+                    match = re.search(r"/ajax/libs/([^/]+)/([^/]+)/", lib_url)
+                    if match:
+                        pkg = match.group(1)
+                        ver = match.group(2)
+                        lib_url = f"https://esm.sh/{pkg}@{ver}"
+
+                # Fallback: Ensure .js extension if not using esm.sh (which doesn't need it)
+                elif not lib_url.endswith('.js') and "esm.sh" not in lib_url:
                     lib_url += '.js'
+                    
                 imports.append(f'import {lib_name} from "{lib_url}";')
         
         # Remove require.config() block
