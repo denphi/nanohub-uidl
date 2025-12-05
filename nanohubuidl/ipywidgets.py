@@ -354,10 +354,54 @@ def buildWidget(proj, *args, **kwargs):
     # Generate Prop Definitions (Local Functions)
     prop_defs_code = ""
     prop_definitions = project.get("root", {}).get("propDefinitions", {})
+    
+    # Python methods to be added to the class
+    python_methods = {}
+    
+    # Helper for handling messages
+    def _handle_custom_msg(self, content, buffers):
+        if "event" in content:
+            event_name = content["event"]
+            data = content.get("data", [])
+            if event_name in self._callbacks:
+                for callback in self._callbacks[event_name]:
+                    # Call with unpacked arguments if list, or single arg
+                    if isinstance(data, list):
+                        callback(*data)
+                    else:
+                        callback(data)
+
+    python_methods["_handle_custom_msg"] = _handle_custom_msg
+    
+    # Init method to setup callbacks
+    def __init__(self, **kwargs):
+        anywidget.AnyWidget.__init__(self, **kwargs)
+        self._callbacks = {}
+        self.on_msg(self._handle_custom_msg)
+        
+    python_methods["__init__"] = __init__
+
     for prop_name, prop_def in prop_definitions.items():
         if prop_def.get("type") == "func":
             default_val = prop_def.get("defaultValue", "()=>{}")
-            prop_defs_code += f"  const {prop_name} = {default_val};\n"
+            
+            # JS: Wrap the function to send message to Python
+            # We execute the original logic AND send the event
+            prop_defs_code += f"  const {prop_name} = (...args) => {{\n"
+            prop_defs_code += f"    model.send({{ event: '{prop_name}', data: args }});\n"
+            prop_defs_code += f"    return ({default_val})(...args);\n"
+            prop_defs_code += f"  }};\n"
+            
+            # Python: Add method to register callback
+            # We need a closure to capture prop_name
+            def make_registrar(name):
+                def registrar(self, callback):
+                    if name not in self._callbacks:
+                        self._callbacks[name] = []
+                    self._callbacks[name].append(callback)
+                return registrar
+            
+            python_methods[prop_name] = make_registrar(prop_name)
 
     # Generate State Hooks
     hooks_code = ""
@@ -406,15 +450,7 @@ def buildWidget(proj, *args, **kwargs):
 
     # 3. Final Widget Class
     attrs["_esm"] = Unicode(esm).tag(sync=True)
-    
-    # Initialize method
-    def do_init(self, **kwargs):
-        anywidget.AnyWidget.__init__(self, **kwargs)
-        # Set default values
-        for k, v in defaults.items():
-            setattr(self, k, v)
-            
-    attrs["__init__"] = do_init
+    attrs.update(python_methods)
     
     return type(component_name + "Widget", (anywidget.AnyWidget,), attrs)
 
