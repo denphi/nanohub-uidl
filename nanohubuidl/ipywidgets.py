@@ -475,9 +475,9 @@ def buildWidget(proj, *args, **kwargs):
         
         # Build import statements for libraries
         imports = []
-        # Use jsdelivr for base widgets and underscore (esm.sh caused "class heritage" errors)
-        imports.append('import * as widgets from "https://cdn.jsdelivr.net/npm/@jupyter-widgets/base@6/+esm";')
-        imports.append('import _ from "https://cdn.jsdelivr.net/npm/underscore@1.13.6/+esm";')
+        # Use esm.sh with pinned dependencies to ensure Backbone loads correctly
+        imports.append('import * as widgets from "https://esm.sh/@jupyter-widgets/base@6?deps=underscore@1.13.6,backbone@1.4.1,jquery@3.7.1";')
+        imports.append('import _ from "https://esm.sh/underscore@1.13.6";')
         
         # Add other library imports - use CDN URLs for ESM
         for lib_name in libraries.keys():
@@ -518,9 +518,9 @@ def buildWidget(proj, *args, **kwargs):
                 # Determine import style
                 # Some libraries (like @mui/material) don't have a default export, so we must use "import * as"
                 if "@mui" in lib_url or "@material-ui" in lib_url:
-                    imports.append(f'import * as {lib_name} from "{lib_url}";')
+                    imports.append(f"import * as {lib_name} from \"{lib_url}\";")
                 else:
-                    imports.append(f'import {lib_name} from "{lib_url}";')
+                    imports.append(f"import {lib_name} from \"{lib_url}\";")
         
         # Remove require.config() block
         module_body = re.sub(
@@ -537,31 +537,10 @@ def buildWidget(proj, *args, **kwargs):
             module_body
         )
         
-        # Remove define('react', ...) and define('react-dom', ...) wrappers
-        module_body = re.sub(
-            r"define\(['\"]react['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{.*?\}\s*\);",
-            "",
-            module_body,
-            flags=re.DOTALL
-        )
-        module_body = re.sub(
-            r"define\(['\"]react-dom['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{.*?\}\s*\);",
-            "",
-            module_body,
-            flags=re.DOTALL
-        )
+        # Remove define() wrapper
+        # Regex to match define('name', ['deps'], function(deps) { ... })
+        define_pattern = r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{"
         
-        # Remove Axios define if present
-        module_body = re.sub(
-            r"define\(['\"]Axios['\"],.*?\}\);",
-            "",
-            module_body,
-            flags=re.DOTALL
-        )
-        
-        # Extract the main component define() block
-        # Find the define() call for the component
-        define_pattern = r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{(.*)\}\);"
         match = re.search(define_pattern, module_body, flags=re.DOTALL)
         
         if match:
@@ -584,6 +563,15 @@ def buildWidget(proj, *args, **kwargs):
         
         # Build ESM module
         esm = "\n".join(imports) + "\n\n"
+        
+        # Add debug logging for base widgets
+        esm += "console.log('Loaded widgets module:', widgets);\n"
+        esm += "try {\n"
+        esm += "    console.log('DOMWidgetView:', widgets.DOMWidgetView);\n"
+        esm += "} catch (e) {\n"
+        esm += "    console.error('Error accessing DOMWidgetView:', e);\n"
+        esm += "}\n\n"
+        
         esm += module_body.strip() + "\n\n"
         
         # Add anywidget bridge
