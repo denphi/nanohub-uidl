@@ -489,10 +489,21 @@ def buildWidget(proj, *args, **kwargs):
 
                 # Check if this function has (props)=> parameter
                 if re.search(r'\(props\)\s*=>', default_val):
-                    # This function uses (props) as parameter, so rename props.* to _props.*
-                    # First rename the parameter
+                    # This function uses (props) as parameter, so we need to be careful:
+                    # - props.xxx where xxx is ALSO a prop definition should become just xxx (access outer const)
+                    # - props.xxx where xxx is NOT a prop definition should become _props.xxx (access param)
+
+                    # First, replace props.propName( with just propName( for prop definitions (before renaming props)
+                    for other_prop_name in comp_prop_defs.keys():
+                        # Replace props.propName( with propName( (function calls to outer consts)
+                        default_val = re.sub(rf'\bprops\.{other_prop_name}\(', f'{other_prop_name}(', default_val)
+
+                    # Then rename the parameter and bare 'props' references
                     default_val = re.sub(r'\(props\)\s*=>', r'(_props)=>', default_val)
-                    # Then rename all props. references to _props.
+                    # Replace standalone 'props' identifier (like in function calls) with _props
+                    default_val = re.sub(r'\b(props)(?=\s*[,\)])', r'_props', default_val)
+
+                    # Then rename remaining props. references to _props. (these are actual component props)
                     default_val = re.sub(r'\bprops\.', r'_props.', default_val)
 
                 # For functions with (self, ...) parameter, rename both parameter and references
