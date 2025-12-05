@@ -95,14 +95,14 @@ def buildWidget(proj, *args, **kwargs):
             attrs[name] = Unicode(defaults[name]).tag(sync=True)
 
     # 2. JavaScript Generation
-    
+
     # Collect dependencies
     dependencies = {} # path -> { version, imports: set(), default: bool }
-    
+
     def collect_deps(n):
         # Check for dependency in the node itself (rare) or in its content (common for TeleportElement)
         content = n.get("content", {})
-        
+
         # Check content for dependency
         if isinstance(content, dict) and "dependency" in content:
             dep = content["dependency"]
@@ -110,16 +110,16 @@ def buildWidget(proj, *args, **kwargs):
                 path = dep["path"]
                 version = dep.get("version", "latest")
                 meta = dep.get("meta", {})
-                
+
                 if path not in dependencies:
                     dependencies[path] = {"version": version, "imports": set(), "default": False}
-                
+
                 if meta.get("namedImport"):
                     original_name = meta.get("originalName", content.get("elementType"))
                     dependencies[path]["imports"].add(original_name)
                 else:
                     dependencies[path]["default"] = True
-        
+
         # Also check node level (just in case)
         if "dependency" in n:
             dep = n["dependency"]
@@ -127,35 +127,52 @@ def buildWidget(proj, *args, **kwargs):
                 path = dep["path"]
                 version = dep.get("version", "latest")
                 meta = dep.get("meta", {})
-                
+
                 if path not in dependencies:
                     dependencies[path] = {"version": version, "imports": set(), "default": False}
-                
+
                 if meta.get("namedImport"):
                     original_name = meta.get("originalName", content.get("elementType"))
                     dependencies[path]["imports"].add(original_name)
                 else:
                     dependencies[path]["default"] = True
-        
+
         if isinstance(content, dict) and "children" in content:
             for child in content["children"]:
                 collect_deps(child)
-                
+
     collect_deps(node)
-    
+
+    # Collect dependencies from custom components
+    custom_components = project.get("components", {})
+    for comp_name, comp_def in custom_components.items():
+        comp_node = comp_def.get("node", {})
+        collect_deps(comp_node)
+
+    # Check if we need to add Format dependency for FormatCustomNumber
+    if "FormatCustomNumber" in custom_components:
+        if "react-number-format" not in dependencies:
+            dependencies["react-number-format"] = {
+                "version": "4.3.1",
+                "imports": set(["NumericFormat"]),
+                "default": False
+            }
+        else:
+            dependencies["react-number-format"]["imports"].add("NumericFormat")
+
     # Build Imports
     js_imports = []
     js_imports.append('import * as React from "https://esm.sh/react@18.2.0";')
     js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0";')
-    
+
     for path, info in dependencies.items():
         url = f"https://esm.sh/{path}"
         if info["version"] and info["version"] != "latest":
             url += f"@{info['version']}"
-            
+
         # Force shared React dependency to avoid "Invalid Hook Call" (Error #321)
         url += "?deps=react@18.2.0"
-            
+
         # Handle imports
         import_clauses = []
         if info["default"]:
@@ -163,13 +180,17 @@ def buildWidget(proj, *args, **kwargs):
             safe_name = re.sub("[^a-zA-Z0-9]+", "", path) + "Default"
             import_clauses.append(f"default as {safe_name}")
             # We might need to map this back to the component usage
-            
+
         named = sorted(list(info["imports"]))
         if named:
             import_clauses.extend(named)
-            
+
         if import_clauses:
             js_imports.append(f'import {{ {", ".join(import_clauses)} }} from "{url}";')
+
+    # Add alias for Format (backward compatibility with FormatCustomNumber)
+    if "FormatCustomNumber" in custom_components:
+        js_imports.append('const Format = NumericFormat;')
 
     # Parse Events for Functional Component
     def parse_events(events_dict):
@@ -250,23 +271,26 @@ def buildWidget(proj, *args, **kwargs):
         return event_handlers
 
     # Build Component Tree
-    def build_react_element(n, indent=8):
+    def build_react_element(n, indent=8, context="root"):
         spaces = " " * indent
         content = n.get("content", {})
         element_type = content.get("elementType", "div") if isinstance(content, dict) else "div"
         semantic_type = content.get("semanticType") if isinstance(content, dict) else None
-        
+
         # Determine the component name to use
         tag_name = element_type
-        
+
+        # Check if this is a custom component
+        if semantic_type in custom_components or element_type in custom_components:
+            # Custom component - use it directly without quotes
+            tag_name = semantic_type if semantic_type in custom_components else element_type
         # Check for dependency in content
-        if isinstance(content, dict) and "dependency" in content:
+        elif isinstance(content, dict) and "dependency" in content:
             meta = content["dependency"].get("meta", {})
             if meta.get("namedImport"):
                 tag_name = meta.get("originalName", element_type)
-        
         # Map container to div
-        if tag_name == "container":
+        elif tag_name == "container":
             tag_name = "'div'"
         elif tag_name == "text":
             tag_name = "'span'"
@@ -315,7 +339,7 @@ def buildWidget(proj, *args, **kwargs):
                         children_code.append(f'{spaces}  props.{ref_id}')
                         
                 elif child_type == "element":
-                    children_code.append(build_react_element(child, indent + 2))
+                    children_code.append(build_react_element(child, indent + 2, context))
         
         # Serialize props, but handle event handlers (which are raw strings)
         # We can't use json.dumps for functions.
@@ -333,11 +357,18 @@ def buildWidget(proj, *args, **kwargs):
                         props_items.append(f'"{k}": {val}')
                         continue
                     elif c.get("referenceType") == "prop":
-                         # For now, assume local variable if it matches a propDefinition
-                         # or props.name if it's passed
-                         # But wait, we defined local variables for propDefinitions?
-                         # Let's assume local variable for now as we will generate them
+                         # In custom components, props are local consts or props.name
+                         # In root component with model, some are local functions
                          val = c.get("id")
+                         # Clean up references like "property(this.props)" -> "property(props)"
+                         val = val.replace("this.props", "props").replace("self.props", "props")
+                         # Remove self.state references
+                         if "self.state" in val:
+                             val = val.replace("self.state.", "")
+                         # For simple prop names in custom components that aren't function defs, add props. prefix
+                         if context == "custom" and "(" not in val and "props." not in val:
+                             # Check if this is a prop definition (function) or a simple prop reference
+                             val = f"props.{val}"
                          props_items.append(f'"{k}": {val}')
                          continue
 
@@ -437,8 +468,48 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "\n  );\n"
     component_body += "}\n"
 
+    # Generate custom component functions
+    custom_component_code = ""
+    for comp_name, comp_def in custom_components.items():
+        comp_prop_defs = comp_def.get("propDefinitions", {})
+        comp_state_defs = comp_def.get("stateDefinitions", {})
+        comp_node = comp_def.get("node", {})
+
+        # Start component function
+        custom_component_code += f"function {comp_name}(props) {{\n"
+
+        # Add prop definitions as local variables
+        for prop_name, prop_def in comp_prop_defs.items():
+            if prop_def.get("type") == "func":
+                default_val = prop_def.get("defaultValue", "()=>{}")
+                custom_component_code += f"  const {prop_name} = props.{prop_name} || {default_val};\n"
+
+        # Add state hooks for component state
+        for state_name, state_def in comp_state_defs.items():
+            default_val = state_def.get("defaultValue")
+
+            # Handle dynamic default values
+            if isinstance(default_val, dict) and default_val.get("type") == "dynamic":
+                ref_content = default_val.get("content", {})
+                if ref_content.get("referenceType") == "prop":
+                    ref_id = ref_content.get("id")
+                    custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState({ref_id});\n"
+                else:
+                    # Fallback to undefined
+                    custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState(undefined);\n"
+            else:
+                # Static default value
+                custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState({json.dumps(default_val)});\n"
+
+        # Add render return
+        custom_component_code += "  return (\n"
+        custom_component_code += build_react_element(comp_node, 4, "custom")
+        custom_component_code += "\n  );\n"
+        custom_component_code += "}\n\n"
+
     # Assemble ESM
     esm = "\n".join(js_imports) + "\n\n"
+    esm += custom_component_code
     esm += component_body + "\n\n"
     esm += "export default {\n"
     esm += "  render({ model, el }) {\n"
