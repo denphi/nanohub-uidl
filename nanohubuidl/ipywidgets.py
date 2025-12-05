@@ -506,6 +506,11 @@ def buildWidget(proj, *args, **kwargs):
                         ver = match.group(2)
                         lib_url = f"https://esm.sh/{pkg}@{ver}"
 
+                elif "cdn.plot.ly" in lib_url:
+                    # Plotly CDN doesn't support ESM default exports directly
+                    # Use esm.sh version of the minified dist
+                    lib_url = "https://esm.sh/plotly.js-dist-min"
+
                 # Fallback: Ensure .js extension if not using esm.sh (which doesn't need it)
                 elif not lib_url.endswith('.js') and "esm.sh" not in lib_url:
                     lib_url += '.js'
