@@ -165,6 +165,9 @@ def buildWidget(proj, *args, **kwargs):
     js_imports.append('import * as React from "https://esm.sh/react@18.2.0";')
     js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0";')
 
+    # Check if Material-UI is used and needs theme provider
+    has_material_ui = "@material-ui/core" in dependencies
+
     for path, info in dependencies.items():
         url = f"https://esm.sh/{path}"
         if info["version"] and info["version"] != "latest":
@@ -192,6 +195,13 @@ def buildWidget(proj, *args, **kwargs):
     if "FormatCustomNumber" in custom_components:
         # v4.3.1 uses default export, so we imported as reactnumberformatDefault
         js_imports.append('const Format = reactnumberformatDefault;')
+
+    # Add Material-UI theme support
+    if has_material_ui:
+        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://esm.sh/@material-ui/core/styles?deps=react@18.2.0";')
+        js_imports.append('')
+        js_imports.append('// Create Material-UI theme')
+        js_imports.append('const muiTheme = createMuiTheme();')
 
     # Parse Events for Functional Component
     def parse_events(events_dict):
@@ -304,7 +314,11 @@ def buildWidget(proj, *args, **kwargs):
         attrs_dict = content.get("attrs", {}) if isinstance(content, dict) else {}
         for k, v in attrs_dict.items():
             props[k] = v
-            
+
+        # Add style if present
+        if isinstance(content, dict) and "style" in content:
+            props["style"] = content["style"]
+
         # Events
         events_dict = content.get("events", {}) if isinstance(content, dict) else {}
         event_handlers = parse_events(events_dict)
@@ -464,9 +478,17 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "  }, [model]);\n\n"
     
     # Render
-    component_body += "  return (\n"
-    component_body += build_react_element(node, 4)
-    component_body += "\n  );\n"
+    if has_material_ui:
+        # Wrap with Material-UI ThemeProvider
+        component_body += "  return (\n"
+        component_body += "    React.createElement(MuiThemeProvider, {theme: muiTheme},\n"
+        component_body += build_react_element(node, 6)
+        component_body += ")\n"
+        component_body += "  );\n"
+    else:
+        component_body += "  return (\n"
+        component_body += build_react_element(node, 4)
+        component_body += "\n  );\n"
     component_body += "}\n"
 
     # Generate custom component functions
