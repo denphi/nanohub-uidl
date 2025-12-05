@@ -171,6 +171,84 @@ def buildWidget(proj, *args, **kwargs):
         if import_clauses:
             js_imports.append(f'import {{ {", ".join(import_clauses)} }} from "{url}";')
 
+    # Parse Events for Functional Component
+    def parse_events(events_dict):
+        event_handlers = {}
+        valid_events = {
+            "click": "onClick",
+            "focus": "onFocus",
+            "blur": "onBlur",
+            "change": "onChange",
+            "submit": "onSubmit",
+            "keydown": "onKeyDown",
+            "keyup": "onKeyUp",
+            "keypress": "onKeyPress",
+            "mouseenter": "onMouseEnter",
+            "mouseleave": "onMouseLeave",
+            "mouseover": "onMouseOver",
+            "select": "onSelect",
+            "touchstart": "onTouchStart",
+            "touchend": "onTouchEnd",
+            "scroll": "onScroll",
+            "load": "onLoad",
+        }
+
+        for ev, actions in events_dict.items():
+            handler_name = valid_events.get(ev, ev)
+            
+            # Build function body
+            body = ""
+            if isinstance(actions, list):
+                action_list = actions
+            else:
+                action_list = [actions]
+                
+            for action in action_list:
+                if not isinstance(action, dict):
+                    continue
+                    
+                action_type = action.get("type")
+                
+                if action_type == "stateChange":
+                    modifies = action.get("modifies")
+                    new_state = action.get("newState")
+                    
+                    # Handle $toggle and $ references
+                    val_expr = ""
+                    if isinstance(new_state, str):
+                        if new_state == "$toggle":
+                            val_expr = f"!{modifies}"
+                        elif new_state.startswith("$"):
+                            val_expr = new_state[1:]
+                        else:
+                            val_expr = json.dumps(new_state)
+                    else:
+                        val_expr = json.dumps(new_state)
+                        
+                    # Generate update code
+                    # set_variable(val); model.set('variable', val); model.save_changes();
+                    body += f"set_{modifies}({val_expr});\n"
+                    body += f"model.set('{modifies}', {val_expr});\n"
+                    body += "model.save_changes();\n"
+                    
+                elif action_type == "propCall" or action_type == "propCall2":
+                    calls = action.get("calls")
+                    args = action.get("args", [])
+                    # In root component, these are local functions defined from propDefinitions
+                    # or passed props if not root (but we are building root mostly)
+                    args_str = ", ".join([a if not a.startswith("'") else a for a in args])
+                    body += f"{calls}({args_str});\n"
+                    
+                elif action_type == "logging":
+                    modifies = action.get("modifies")
+                    new_state = action.get("newState")
+                    body += f"console.log('{modifies}', {json.dumps(new_state)});\n"
+
+            if body:
+                event_handlers[handler_name] = f"(e) => {{ {body} }}"
+        
+        return event_handlers
+
     # Build Component Tree
     def build_react_element(n, indent=8):
         spaces = " " * indent
@@ -202,6 +280,12 @@ def buildWidget(proj, *args, **kwargs):
         for k, v in attrs_dict.items():
             props[k] = v
             
+        # Events
+        events_dict = content.get("events", {}) if isinstance(content, dict) else {}
+        event_handlers = parse_events(events_dict)
+        for k, v in event_handlers.items():
+            props[k] = v
+
         # Handle dynamic props (state references)
         # The UIDL structure for children often contains dynamic content
         # But attributes can also be dynamic? The example shows 'children' having dynamic types.
@@ -233,8 +317,33 @@ def buildWidget(proj, *args, **kwargs):
                 elif child_type == "element":
                     children_code.append(build_react_element(child, indent + 2))
         
-        props_str = json.dumps(props)
-        # We might need to merge dynamic props here if they exist in a different structure
+        # Serialize props, but handle event handlers (which are raw strings)
+        # We can't use json.dumps for functions.
+        props_items = []
+        for k, v in props.items():
+            if k in event_handlers:
+                props_items.append(f'"{k}": {v}')
+            else:
+                # Handle dynamic props in attributes
+                val = v
+                if isinstance(v, dict) and v.get("type") == "dynamic":
+                    c = v.get("content", {})
+                    if c.get("referenceType") == "state":
+                        val = c.get("id")
+                        props_items.append(f'"{k}": {val}')
+                        continue
+                    elif c.get("referenceType") == "prop":
+                         # For now, assume local variable if it matches a propDefinition
+                         # or props.name if it's passed
+                         # But wait, we defined local variables for propDefinitions?
+                         # Let's assume local variable for now as we will generate them
+                         val = c.get("id")
+                         props_items.append(f'"{k}": {val}')
+                         continue
+
+                props_items.append(f'"{k}": {json.dumps(val)}')
+        
+        props_str = "{" + ", ".join(props_items) + "}"
         
         children_str = ""
         if children_code:
@@ -242,13 +351,26 @@ def buildWidget(proj, *args, **kwargs):
             
         return f"{spaces}React.createElement({tag_name}, {props_str}{children_str})"
 
-    # Generate Component Body
-    component_body = f"function {component_name}({{ model }}) {{\n"
-    
-    # State Hooks
+    # Generate Prop Definitions (Local Functions)
+    prop_defs_code = ""
+    prop_definitions = project.get("root", {}).get("propDefinitions", {})
+    for prop_name, prop_def in prop_definitions.items():
+        if prop_def.get("type") == "func":
+            default_val = prop_def.get("defaultValue", "()=>{}")
+            prop_defs_code += f"  const {prop_name} = {default_val};\n"
+
+    # Generate State Hooks
+    hooks_code = ""
     for name in state_defs.keys():
-        component_body += f"  const [{name}, set_{name}] = React.useState(model.get('{name}'));\n"
+        hooks_code += f"  const [{name}, set_{name}] = React.useState(model.get('{name}'));\n"
         
+    component_body = f"function {component_name}({{ model }}) {{\n"
+    # Add prop definitions
+    component_body += prop_defs_code + "\n"
+    
+    # Add hooks
+    component_body += hooks_code + "\n"
+    
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
     component_body += "    const update = () => {\n"
