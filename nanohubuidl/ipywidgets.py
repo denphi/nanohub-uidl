@@ -24,6 +24,24 @@ from IPython.display import HTML, Javascript, display
 
 
 def buildWidget(proj, *args, **kwargs):
+    # JavaScript reserved keywords and built-in identifiers
+    JS_RESERVED_KEYWORDS = {
+        'abstract', 'arguments', 'await', 'boolean', 'break', 'byte', 'case', 'catch',
+        'char', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
+        'double', 'else', 'enum', 'eval', 'export', 'extends', 'false', 'final',
+        'finally', 'float', 'for', 'function', 'goto', 'if', 'implements', 'import',
+        'in', 'instanceof', 'int', 'interface', 'let', 'long', 'native', 'new',
+        'null', 'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+        'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient',
+        'true', 'try', 'typeof', 'var', 'void', 'volatile', 'while', 'with', 'yield'
+    }
+
+    def sanitize_js_identifier(name):
+        """Sanitize JavaScript identifier by prefixing reserved keywords with underscore"""
+        if name.lower() in JS_RESERVED_KEYWORDS:
+            return f"_{name}"
+        return name
+
     # Handle input (dict or object)
     if isinstance(proj, dict):
         project = proj
@@ -243,23 +261,24 @@ def buildWidget(proj, *args, **kwargs):
                 
                 if action_type == "stateChange":
                     modifies = action.get("modifies")
+                    js_modifies = sanitize_js_identifier(modifies)
                     new_state = action.get("newState")
-                    
+
                     # Handle $toggle and $ references
                     val_expr = ""
                     if isinstance(new_state, str):
                         if new_state == "$toggle":
-                            val_expr = f"!{modifies}"
+                            val_expr = f"!{js_modifies}"
                         elif new_state.startswith("$"):
                             val_expr = new_state[1:]
                         else:
                             val_expr = json.dumps(new_state)
                     else:
                         val_expr = json.dumps(new_state)
-                        
+
                     # Generate update code
                     # set_variable(val); model.set('variable', val); model.save_changes();
-                    body += f"set_{modifies}({val_expr});\n"
+                    body += f"set_{js_modifies}({val_expr});\n"
                     body += f"model.set('{modifies}', {val_expr});\n"
                     body += "model.save_changes();\n"
                     
@@ -348,7 +367,8 @@ def buildWidget(proj, *args, **kwargs):
                     # State reference
                     ref_id = child_content.get("id")
                     if child_content.get("referenceType") == "state":
-                        children_code.append(f'{spaces}  {ref_id}')
+                        js_ref_id = sanitize_js_identifier(ref_id)
+                        children_code.append(f'{spaces}  {js_ref_id}')
                     elif child_content.get("referenceType") == "prop":
                         # Prop passed to component (not fully supported in top-level widget yet)
                         children_code.append(f'{spaces}  props.{ref_id}')
@@ -369,7 +389,8 @@ def buildWidget(proj, *args, **kwargs):
                     c = v.get("content", {})
                     if c.get("referenceType") == "state":
                         val = c.get("id")
-                        props_items.append(f'"{k}": {val}')
+                        js_val = sanitize_js_identifier(val)
+                        props_items.append(f'"{k}": {js_val}')
                         continue
                     elif c.get("referenceType") == "prop":
                          # In custom components, props are local consts or props.name
@@ -452,25 +473,27 @@ def buildWidget(proj, *args, **kwargs):
     # Generate State Hooks
     hooks_code = ""
     for name in state_defs.keys():
-        hooks_code += f"  const [{name}, set_{name}] = React.useState(model.get('{name}'));\n"
-        
+        js_name = sanitize_js_identifier(name)
+        hooks_code += f"  const [{js_name}, set_{js_name}] = React.useState(model.get('{name}'));\n"
+
     component_body = f"function {component_name}({{ model }}) {{\n"
     # Add prop definitions
     component_body += prop_defs_code + "\n"
-    
+
     # Add hooks
     component_body += hooks_code + "\n"
-    
+
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
     component_body += "    const update = () => {\n"
     for name in state_defs.keys():
-        component_body += f"      set_{name}(model.get('{name}'));\n"
+        js_name = sanitize_js_identifier(name)
+        component_body += f"      set_{js_name}(model.get('{name}'));\n"
     component_body += "    };\n"
-    
+
     for name in state_defs.keys():
         component_body += f"    model.on('change:{name}', update);\n"
-        
+
     component_body += "    return () => {\n"
     for name in state_defs.keys():
         component_body += f"      model.off('change:{name}', update);\n"
@@ -600,6 +623,7 @@ def buildWidget(proj, *args, **kwargs):
 
         # Add state hooks for component state
         for state_name, state_def in comp_state_defs.items():
+            js_state_name = sanitize_js_identifier(state_name)
             default_val = state_def.get("defaultValue")
 
             # Handle dynamic default values
@@ -607,13 +631,13 @@ def buildWidget(proj, *args, **kwargs):
                 ref_content = default_val.get("content", {})
                 if ref_content.get("referenceType") == "prop":
                     ref_id = ref_content.get("id")
-                    custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState({ref_id});\n"
+                    custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({ref_id});\n"
                 else:
                     # Fallback to undefined
-                    custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState(undefined);\n"
+                    custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState(undefined);\n"
             else:
                 # Static default value
-                custom_component_code += f"  const [{state_name}, set_{state_name}] = React.useState({json.dumps(default_val)});\n"
+                custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({json.dumps(default_val)});\n"
 
         # Add render return
         custom_component_code += "  return (\n"
