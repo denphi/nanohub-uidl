@@ -577,8 +577,35 @@ def buildWidget(proj, *args, **kwargs):
             )
         )
         
-        # Inject JavaScript - this will execute immediately
-        display(Javascript(js))
+        # Wrap JavaScript to ensure RequireJS is available
+        js_wrapped = """
+(function() {
+    // Check if require/define are available
+    if (typeof require !== 'undefined' && typeof define !== 'undefined') {
+        // RequireJS is available, execute the widget code
+        """ + js + """
+    } else {
+        // RequireJS not available - try to wait for it or load it
+        console.warn('RequireJS not immediately available for widget """ + component + """');
+        
+        // Try waiting a bit for RequireJS to load
+        var checkRequire = function(attempts) {
+            if (typeof require !== 'undefined' && typeof define !== 'undefined') {
+                """ + js + """
+            } else if (attempts > 0) {
+                setTimeout(function() { checkRequire(attempts - 1); }, 100);
+            } else {
+                console.error('RequireJS not available after waiting. Widget """ + component + """ cannot load.');
+                console.error('Please ensure you are running in a Jupyter environment with RequireJS support.');
+            }
+        };
+        checkRequire(50); // Try for 5 seconds
+    }
+})();
+        """
+        
+        # Inject wrapped JavaScript
+        display(Javascript(js_wrapped))
         
         widgets.DOMWidget.__init__(s, **k)
         
