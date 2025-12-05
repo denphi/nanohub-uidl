@@ -42,12 +42,14 @@ def buildWidget(proj, *args, **kwargs):
             return f"_{name}"
         return name
 
-    def clean_self_references(expr, state_vars=None):
+    def clean_self_references(expr, state_vars=None, prop_defs=None, is_custom_component=False):
         """Clean up self.props and self.state references in expressions
 
         Args:
             expr: The expression string to clean
             state_vars: Set of state variable names (optional)
+            prop_defs: Set of prop definition names (optional)
+            is_custom_component: Whether this is in a custom component context
 
         Returns:
             Cleaned expression string
@@ -67,6 +69,15 @@ def buildWidget(proj, *args, **kwargs):
                     expr = expr.replace(f"self.state.{state_var}", js_var)
             # Fallback: just remove self.state. prefix
             expr = expr.replace("self.state.", "")
+
+        # In custom components, replace props.propName with just propName for prop definitions
+        # that have been extracted as local consts
+        if is_custom_component and prop_defs:
+            for prop_name in prop_defs:
+                # Use word boundaries to avoid partial matches
+                import re
+                # Replace props.propName with just propName
+                expr = re.sub(rf'\bprops\.{prop_name}\b', prop_name, expr)
 
         return expr
 
@@ -333,7 +344,7 @@ def buildWidget(proj, *args, **kwargs):
         return event_handlers
 
     # Build Component Tree
-    def build_react_element(n, indent=8, context="root"):
+    def build_react_element(n, indent=8, context="root", comp_prop_defs=None, comp_state_defs=None):
         spaces = " " * indent
         content = n.get("content", {})
         element_type = content.get("elementType", "div") if isinstance(content, dict) else "div"
@@ -403,11 +414,15 @@ def buildWidget(proj, *args, **kwargs):
                         children_code.append(f'{spaces}  {js_ref_id}')
                     elif child_content.get("referenceType") == "prop":
                         # Clean up self.props and self.state references in prop expressions
-                        ref_id = clean_self_references(ref_id, state_defs.keys())
+                        # Use component-specific defs if available, otherwise root defs
+                        state_vars = comp_state_defs.keys() if comp_state_defs else state_defs.keys()
+                        prop_defs_keys = comp_prop_defs.keys() if comp_prop_defs else None
+                        is_custom = context == "custom"
+                        ref_id = clean_self_references(ref_id, state_vars, prop_defs_keys, is_custom)
                         children_code.append(f'{spaces}  {ref_id}')
                         
                 elif child_type == "element":
-                    children_code.append(build_react_element(child, indent + 2, context))
+                    children_code.append(build_react_element(child, indent + 2, context, comp_prop_defs, comp_state_defs))
         
         # Serialize props, but handle event handlers (which are raw strings)
         # We can't use json.dumps for functions.
@@ -432,7 +447,10 @@ def buildWidget(proj, *args, **kwargs):
                          # Clean up references like "property(this.props)" -> "property(props)"
                          val = val.replace("this.props", "props")
                          # Clean up self.props and self.state references
-                         val = clean_self_references(val, state_defs.keys())
+                         state_vars = comp_state_defs.keys() if comp_state_defs else state_defs.keys()
+                         prop_defs_keys = comp_prop_defs.keys() if comp_prop_defs else None
+                         is_custom = context == "custom"
+                         val = clean_self_references(val, state_vars, prop_defs_keys, is_custom)
                          # For simple prop names in custom components that aren't function defs, add props. prefix
                          if context == "custom" and "(" not in val and "props." not in val:
                              # Check if this is a prop definition (function) or a simple prop reference
@@ -687,7 +705,7 @@ def buildWidget(proj, *args, **kwargs):
 
         # Add render return
         custom_component_code += "  return (\n"
-        custom_component_code += build_react_element(comp_node, 4, "custom")
+        custom_component_code += build_react_element(comp_node, 4, "custom", comp_prop_defs, comp_state_defs)
         custom_component_code += "\n  );\n"
         custom_component_code += "}\n\n"
 
