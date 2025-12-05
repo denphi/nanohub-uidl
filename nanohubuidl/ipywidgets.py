@@ -540,10 +540,12 @@ def buildWidget(proj, *args, **kwargs):
                 module_body,
                 flags=re.DOTALL
             )
+            # Remove the AMD closing sequence from the end
+            module_body = re.sub(r"\}\);\s*$", "", module_body)
         
-        # Remove the final return statement and closing
-        module_body = re.sub(r"return\s*\{[^}]*\};\s*$", "", module_body, flags=re.DOTALL)
-        module_body = re.sub(r"\}\);?\s*$", "", module_body)
+        # Remove the return statement (which returns the Model/View classes)
+        # This needs to be removed because we are replacing it with ESM exports
+        module_body = re.sub(r"return\s*\{[^}]*\}\s*;?\s*$", "", module_body, flags=re.DOTALL)
         
         # Build ESM module
         esm = "\n".join(imports) + "\n\n"
@@ -555,7 +557,7 @@ def buildWidget(proj, *args, **kwargs):
         
         # Bridge Backbone View to anywidget render function
         esm += "export default {\n"
-        esm += "    render({ model, el }) {\n"
+        esm += "    render: function({ model, el }) {\n"
         esm += f"        const view = new {component_name}View({{ model: model, el: el }});\n"
         esm += "        view.render();\n"
         esm += "    }\n"
