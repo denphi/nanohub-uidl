@@ -6,7 +6,6 @@ import re
 import copy
 
 import ipywidgets as widgets
-import anywidget
 from traitlets import (
     Unicode,
     Integer,
@@ -578,10 +577,13 @@ def buildWidget(proj, *args, **kwargs):
             )
         )
         
-        # anywidget handles JavaScript loading automatically via _esm trait
-        # No need to manually inject JavaScript anymore!
+        # Inject JavaScript - this will execute immediately
+        display(Javascript(js))
         
-        anywidget.AnyWidget.__init__(s, **k)
+        widgets.DOMWidget.__init__(s, **k)
+        
+        # Store JS code in widget for potential re-injection
+        s._js_code = js
         for i, j in f.items():
             setattr(s, "_handlers_" + i, widgets.CallbackDispatcher())
             setattr(
@@ -610,40 +612,41 @@ def buildWidget(proj, *args, **kwargs):
         if hasattr(s, "__validate"):
             if n in d:
                 if isinstance(d[n], str):
-                    anywidget.AnyWidget.__setattr__(s, n, str(v))
+                    widgets.DOMWidget.__setattr__(s, n, str(v))
                 elif type(d[n]) == bool:
-                    anywidget.AnyWidget.__setattr__(
+                    widgets.DOMWidget.__setattr__(
                         s,
                         n,
                         v
                         in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"],
                     )
                 elif isinstance(d[n], list):
-                    anywidget.AnyWidget.__setattr__(s, n, list(v))
+                    widgets.DOMWidget.__setattr__(s, n, list(v))
                 elif isinstance(d[n], dict):
                     vc = dict(getattr(s, n))
                     vc.update(v)
-                    anywidget.AnyWidget.__setattr__(s, n, vc)
+                    widgets.DOMWidget.__setattr__(s, n, vc)
                 elif isinstance(d[n], int):
-                    anywidget.AnyWidget.__setattr__(s, n, int(v))
+                    widgets.DOMWidget.__setattr__(s, n, int(v))
                 elif isinstance(d[n], float):
-                    anywidget.AnyWidget.__setattr__(s, n, float(v))
+                    widgets.DOMWidget.__setattr__(s, n, float(v))
                 else:
-                    anywidget.AnyWidget.__setattr__(s, n, v)
+                    widgets.DOMWidget.__setattr__(s, n, v)
             else:
-                anywidget.AnyWidget.__setattr__(s, n, v)
+                widgets.DOMWidget.__setattr__(s, n, v)
 
         else:
-            anywidget.AnyWidget.__setattr__(s, n, v)
+            widgets.DOMWidget.__setattr__(s, n, v)
 
-    # Use anywidget for remote compatibility
-    # Store ESM JavaScript module code
-    attrs["_esm"] = Unicode(js_esm).tag(sync=True)
+    # Use DOMWidget with embedded JavaScript for remote compatibility
+    # Store the JavaScript code to be injected when widget is displayed
+    attrs["_js_code"] = Unicode(js).tag(sync=True)
     
-    # anywidget doesn't need these module traits - it handles them automatically
-    # But we keep them for backward compatibility with existing code
     attrs["_model_name"] = Unicode(component + "Model").tag(sync=True)
+    attrs["_model_module"] = Unicode(component).tag(sync=True)
     attrs["_view_name"] = Unicode(component + "View").tag(sync=True)
+    attrs["_view_module"] = Unicode(component).tag(sync=True)
+    attrs["_view_module_version"] = Unicode("0.1.0").tag(sync=True)
     
     attrs["__init__"] = lambda s, **k: do_init(s, default, functions, **k)
     attrs["_handle_uidl_msg"] = lambda s, c, b,: do_handle_msg(
@@ -651,7 +654,7 @@ def buildWidget(proj, *args, **kwargs):
     )
     attrs["__setattr__"] = lambda s, n, v, d=default: do__setattr(s, n, v, d)
 
-    return type(component + "Widget", (anywidget.AnyWidget,), attrs)
+    return type(component + "Widget", (widgets.DOMWidget,), attrs)
 
 
 def parseJSX(document, *args, **kwargs):

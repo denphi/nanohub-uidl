@@ -92,8 +92,7 @@ setup_args = {
         'simtool',
         'jupyter_server',
         'notebook>=7',
-        'ipywidgets>=8.0.0,<9',
-        'anywidget>=0.9.0'
+        'ipywidgets>=8.0.0,<9'
     ],
     'extras_require' : {
         'test': [
