@@ -510,7 +510,12 @@ def buildWidget(proj, *args, **kwargs):
                 elif not lib_url.endswith('.js') and "esm.sh" not in lib_url:
                     lib_url += '.js'
                     
-                imports.append(f'import {lib_name} from "{lib_url}";')
+                # Determine import style
+                # Some libraries (like @mui/material) don't have a default export, so we must use "import * as"
+                if "@mui" in lib_url or "@material-ui" in lib_url:
+                    imports.append(f'import * as {lib_name} from "{lib_url}";')
+                else:
+                    imports.append(f'import {lib_name} from "{lib_url}";')
         
         # Remove require.config() block
         module_body = re.sub(
