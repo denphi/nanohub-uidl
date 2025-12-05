@@ -146,12 +146,15 @@ def buildWidget(proj, *args, **kwargs):
     # Build Imports
     js_imports = []
     js_imports.append('import * as React from "https://esm.sh/react@18.2.0";')
-    js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@18.2.0/client";')
+    js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0";')
     
     for path, info in dependencies.items():
         url = f"https://esm.sh/{path}"
         if info["version"] and info["version"] != "latest":
             url += f"@{info['version']}"
+            
+        # Force shared React dependency to avoid "Invalid Hook Call" (Error #321)
+        url += "?deps=react@18.2.0"
             
         # Handle imports
         import_clauses = []
