@@ -475,9 +475,9 @@ def buildWidget(proj, *args, **kwargs):
         
         # Build import statements for libraries
         imports = []
-        # Use CDN URLs for base widgets and underscore to avoid "bare specifier" errors
-        imports.append('import * as widgets from "https://cdn.jsdelivr.net/npm/@jupyter-widgets/base@6/+esm";')
-        imports.append('import _ from "https://cdn.jsdelivr.net/npm/underscore@1.13.6/+esm";')
+        # Use esm.sh for base widgets and underscore for better dependency handling
+        imports.append('import * as widgets from "https://esm.sh/@jupyter-widgets/base@6";')
+        imports.append('import _ from "https://esm.sh/underscore@1.13.6";')
         
         # Add other library imports - use CDN URLs for ESM
         for lib_name in libraries.keys():
@@ -593,8 +593,15 @@ def buildWidget(proj, *args, **kwargs):
         # Bridge Backbone View to anywidget render function
         esm += "export default {\n"
         esm += "    render: function({ model, el }) {\n"
-        esm += f"        const view = new {component_name}View({{ model: model, el: el }});\n"
-        esm += "        view.render();\n"
+        esm += f"        console.log('Rendering widget {component_name}');\n"
+        esm += f"        try {{\n"
+        esm += f"            const view = new {component_name}View({{ model: model, el: el }});\n"
+        esm += "            view.render();\n"
+        esm += "        } catch (e) {\n"
+        esm += f"            console.error('Error rendering widget {component_name}:', e);\n"
+        esm += "            console.log('Widgets module:', widgets);\n"
+        esm += "            throw e;\n"
+        esm += "        }\n"
         esm += "    }\n"
         esm += "};\n"
         
