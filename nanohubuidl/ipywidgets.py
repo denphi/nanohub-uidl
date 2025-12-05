@@ -478,30 +478,76 @@ def buildWidget(proj, *args, **kwargs):
         imports.append('import * as widgets from "@jupyter-widgets/base";')
         imports.append('import _ from "underscore";')
         
-        # Add other library imports
+        # Add other library imports - use CDN URLs for ESM
         for lib_name in libraries.keys():
             if lib_name not in ["require", "React", "ReactDOM"]:
-                # Map library names to their CDN URLs for ESM
-                imports.append(f'import {lib_name} from "{libraries[lib_name]}";')
+                lib_url = libraries[lib_name]
+                # Convert .js URLs to work with ESM
+                if not lib_url.endswith('.js'):
+                    lib_url += '.js'
+                imports.append(f'import {lib_name} from "{lib_url}";')
         
-        # Extract the module body (everything between define(...) and the final });)
-        # Remove the define wrapper and return statement
-        module_body = js_amd
-        
-        # Replace the define() call with direct code
+        # Remove require.config() block
         module_body = re.sub(
-            r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{",
+            r"require\.config\(\{.*?\}\);",
+            "",
+            js_amd,
+            flags=re.DOTALL
+        )
+        
+        # Remove require.undef() calls
+        module_body = re.sub(
+            r"require\.undef\(['\"].*?['\"]\);",
+            "",
+            module_body
+        )
+        
+        # Remove define('react', ...) and define('react-dom', ...) wrappers
+        module_body = re.sub(
+            r"define\(['\"]react['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{.*?\}\s*\);",
+            "",
+            module_body,
+            flags=re.DOTALL
+        )
+        module_body = re.sub(
+            r"define\(['\"]react-dom['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{.*?\}\s*\);",
             "",
             module_body,
             flags=re.DOTALL
         )
         
-        # Remove the final return and closing
-        module_body = re.sub(r"return\s*\{[^}]*\};\s*\}\);?\s*$", "", module_body, flags=re.DOTALL)
+        # Remove Axios define if present
+        module_body = re.sub(
+            r"define\(['\"]Axios['\"],.*?\}\);",
+            "",
+            module_body,
+            flags=re.DOTALL
+        )
+        
+        # Extract the main component define() block
+        # Find the define() call for the component
+        define_pattern = r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{(.*)\}\);"
+        match = re.search(define_pattern, module_body, flags=re.DOTALL)
+        
+        if match:
+            # Extract just the body of the define function
+            module_body = match.group(1)
+        else:
+            # Fallback: try to remove define wrapper more aggressively
+            module_body = re.sub(
+                r"define\(['\"]" + re.escape(component_name) + r"['\"],\s*\[.*?\],\s*function\(.*?\)\s*\{",
+                "",
+                module_body,
+                flags=re.DOTALL
+            )
+        
+        # Remove the final return statement and closing
+        module_body = re.sub(r"return\s*\{[^}]*\};\s*$", "", module_body, flags=re.DOTALL)
+        module_body = re.sub(r"\}\);?\s*$", "", module_body)
         
         # Build ESM module
         esm = "\n".join(imports) + "\n\n"
-        esm += module_body + "\n\n"
+        esm += module_body.strip() + "\n\n"
         esm += f"export {{ {component_name}Model, {component_name}View }};\n"
         
         return esm
