@@ -483,12 +483,26 @@ def buildWidget(proj, *args, **kwargs):
         for prop_name, prop_def in comp_prop_defs.items():
             if prop_def.get("type") == "func":
                 default_val = prop_def.get("defaultValue", "()=>{}")
-                # Fix naming conflicts: rename (props) to (_props) in arrow functions to avoid collision
-                # Also fix self.props -> _self.props and self.state -> _self.state
-                default_val = re.sub(r'\(props\)\s*=>', r'(_props)=>', default_val)
-                default_val = re.sub(r'\bprops\.', r'_props.', default_val)
-                default_val = re.sub(r'\(self,', r'(_self,', default_val)
-                default_val = re.sub(r'\bself\.', r'_self.', default_val)
+                # Fix naming conflicts: rename parameters and their references
+                # Strategy: For functions with (props) or (self, ...) parameters, rename both
+                # the parameter AND its usages within that function scope
+
+                # Check if this function has (props)=> parameter
+                if re.search(r'\(props\)\s*=>', default_val):
+                    # This function uses (props) as parameter, so rename props.* to _props.*
+                    # First rename the parameter
+                    default_val = re.sub(r'\(props\)\s*=>', r'(_props)=>', default_val)
+                    # Then rename all props. references to _props.
+                    default_val = re.sub(r'\bprops\.', r'_props.', default_val)
+
+                # For functions with (self, ...) parameter, rename both parameter and references
+                if re.search(r'\(self,', default_val):
+                    default_val = re.sub(r'\(self,', r'(_self,', default_val)
+                    default_val = re.sub(r'\bself\.props\.', r'_self._props.', default_val)
+                    default_val = re.sub(r'\bself\.state\.', r'_self.state.', default_val)
+                    # Also handle bare self references (like in callbacks)
+                    default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
+
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
 
