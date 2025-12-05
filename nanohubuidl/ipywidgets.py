@@ -154,11 +154,11 @@ def buildWidget(proj, *args, **kwargs):
         if "react-number-format" not in dependencies:
             dependencies["react-number-format"] = {
                 "version": "4.3.1",
-                "imports": set(["NumericFormat"]),
-                "default": False
+                "imports": set(),
+                "default": True  # v4.3.1 uses default export
             }
         else:
-            dependencies["react-number-format"]["imports"].add("NumericFormat")
+            dependencies["react-number-format"]["default"] = True
 
     # Build Imports
     js_imports = []
@@ -190,7 +190,8 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add alias for Format (backward compatibility with FormatCustomNumber)
     if "FormatCustomNumber" in custom_components:
-        js_imports.append('const Format = NumericFormat;')
+        # v4.3.1 uses default export, so we imported as reactnumberformatDefault
+        js_imports.append('const Format = reactnumberformatDefault;')
 
     # Parse Events for Functional Component
     def parse_events(events_dict):
