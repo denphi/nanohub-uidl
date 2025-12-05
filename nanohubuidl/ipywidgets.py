@@ -482,7 +482,14 @@ def buildWidget(proj, *args, **kwargs):
         for prop_name, prop_def in comp_prop_defs.items():
             if prop_def.get("type") == "func":
                 default_val = prop_def.get("defaultValue", "()=>{}")
-                custom_component_code += f"  const {prop_name} = props.{prop_name} || {default_val};\n"
+                # Fix naming conflicts: rename (props) to (_props) in arrow functions to avoid collision
+                # Also fix self.props -> _self.props and self.state -> _self.state
+                default_val = re.sub(r'\(props\)\s*=>', r'(_props)=>', default_val)
+                default_val = re.sub(r'\bprops\.', r'_props.', default_val)
+                default_val = re.sub(r'\(self,', r'(_self,', default_val)
+                default_val = re.sub(r'\bself\.', r'_self.', default_val)
+                # Wrap the default function in parentheses to avoid ambiguity with ||
+                custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
 
         # Add state hooks for component state
         for state_name, state_def in comp_state_defs.items():
