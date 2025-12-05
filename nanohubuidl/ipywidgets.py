@@ -528,7 +528,9 @@ def buildWidget(proj, *args, **kwargs):
 
         # Add prop definitions as local variables
         for prop_name, prop_def in comp_prop_defs.items():
-            if prop_def.get("type") == "func":
+            prop_type = prop_def.get("type")
+
+            if prop_type == "func":
                 default_val = prop_def.get("defaultValue", "()=>{}")
                 # Fix naming conflicts: rename parameters and their references
                 # Strategy: For functions with (props) or (self, ...) parameters, rename both
@@ -563,6 +565,16 @@ def buildWidget(proj, *args, **kwargs):
 
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
+
+            else:
+                # Handle non-function props (objects, strings, numbers, etc.)
+                default_val = prop_def.get("defaultValue")
+                if default_val is not None:
+                    # For non-function props, just create a const with the default value
+                    custom_component_code += f"  const {prop_name} = props.{prop_name} !== undefined ? props.{prop_name} : {json.dumps(default_val)};\n"
+                else:
+                    # No default value, just use the prop directly
+                    custom_component_code += f"  const {prop_name} = props.{prop_name};\n"
 
         # Add state hooks for component state
         for state_name, state_def in comp_state_defs.items():
