@@ -2,8 +2,15 @@ import os
 from traitlets import Unicode
 from jupyter_server.extension.application import ExtensionApp, ExtensionAppJinjaMixin
 from .handlers import *
-from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
-from notebook.utils import url_path_join
+try:
+    # notebook < 7
+    from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
+    from notebook.utils import url_path_join
+except ImportError:
+    # notebook >= 7
+    from jupyter_server.base.handlers import JupyterHandler as IPythonHandler
+    from jupyter_server.base.handlers import FilesRedirectHandler, path_regex
+    from jupyter_server.utils import url_path_join
 
 
 DEFAULT_STATIC_FILES_PATH = os.path.join(os.path.dirname(__file__), "static")

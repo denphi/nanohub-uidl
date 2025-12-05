@@ -1,7 +1,13 @@
 """API handlers for the Jupyter Server example."""
 from jupyter_server.extension.handler import ExtensionHandlerJinjaMixin, ExtensionHandlerMixin
 from jupyter_server.utils import url_escape
-from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
+try:
+    # notebook < 7
+    from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
+except ImportError:
+    # notebook >= 7
+    from jupyter_server.base.handlers import JupyterHandler as IPythonHandler
+    from jupyter_server.base.handlers import FilesRedirectHandler, path_regex
 import tornado
 import re
 import os

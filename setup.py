@@ -88,7 +88,8 @@ setup_args = {
         'nanohub-remote>=0.1.0',
         'simtool',
         'jupyter_server',
-        'notebook<7'
+        'notebook>=7',
+        'ipywidgets>=8.0.0,<9'
     ],
     'extras_require' : {
         'test': [

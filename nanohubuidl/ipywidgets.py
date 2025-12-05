@@ -263,7 +263,8 @@ def buildWidget(proj, *args, **kwargs):
 
     js += "    const Plot = PlotlyComponent.default(Plotly);\n"
 
-    js += "    const " + component + "Model = widgets.WidgetModel.extend({}, {" + eol
+    js += "    const " + component + "Model = widgets.DOMWidgetModel.extend({" + eol
+    js += "    }, {" + eol
     js += "        serializers: _.extend({" + eol
     for i in serializers:
         js += "            " + i + ": { deserialize: widgets.unpack_models }," + eol
@@ -278,7 +279,7 @@ def buildWidget(proj, *args, **kwargs):
         js += (
             "        backbone."
             + i
-            + "_views = new widgets.ViewList(backbone.add_child_model, null, backbone);"
+            + "_views = new widgets.ViewList(backbone.add_child_model.bind(backbone), null, backbone);"
             + eol
         )
         js += "        backbone._" + i + " = [];" + eol
@@ -492,7 +493,7 @@ def buildWidget(proj, *args, **kwargs):
 
         widgets.DOMWidget.__init__(s, **k)
         for i, j in f.items():
-            setattr(s, "_handlers_" + i, widgets.widget.CallbackDispatcher())
+            setattr(s, "_handlers_" + i, widgets.CallbackDispatcher())
             setattr(
                 s,
                 i,
