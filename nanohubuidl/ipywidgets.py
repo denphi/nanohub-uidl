@@ -42,6 +42,34 @@ def buildWidget(proj, *args, **kwargs):
             return f"_{name}"
         return name
 
+    def clean_self_references(expr, state_vars=None):
+        """Clean up self.props and self.state references in expressions
+
+        Args:
+            expr: The expression string to clean
+            state_vars: Set of state variable names (optional)
+
+        Returns:
+            Cleaned expression string
+        """
+        if not isinstance(expr, str):
+            return expr
+
+        # Replace self.props with props
+        expr = expr.replace("self.props", "props")
+
+        # Replace self.state.variableName with variableName (and sanitize if needed)
+        if "self.state." in expr:
+            if state_vars:
+                # Replace each state variable reference
+                for state_var in state_vars:
+                    js_var = sanitize_js_identifier(state_var)
+                    expr = expr.replace(f"self.state.{state_var}", js_var)
+            # Fallback: just remove self.state. prefix
+            expr = expr.replace("self.state.", "")
+
+        return expr
+
     # Handle input (dict or object)
     if isinstance(proj, dict):
         project = proj
@@ -271,6 +299,8 @@ def buildWidget(proj, *args, **kwargs):
                             val_expr = f"!{js_modifies}"
                         elif new_state.startswith("$"):
                             val_expr = new_state[1:]
+                            # Clean up self references in expressions
+                            val_expr = clean_self_references(val_expr, state_defs.keys())
                         else:
                             val_expr = json.dumps(new_state)
                     else:
@@ -281,13 +311,15 @@ def buildWidget(proj, *args, **kwargs):
                     body += f"set_{js_modifies}({val_expr});\n"
                     body += f"model.set('{modifies}', {val_expr});\n"
                     body += "model.save_changes();\n"
-                    
+
                 elif action_type == "propCall" or action_type == "propCall2":
                     calls = action.get("calls")
                     args = action.get("args", [])
                     # In root component, these are local functions defined from propDefinitions
                     # or passed props if not root (but we are building root mostly)
-                    args_str = ", ".join([a if not a.startswith("'") else a for a in args])
+                    # Clean up self references in arguments
+                    cleaned_args = [clean_self_references(a, state_defs.keys()) if isinstance(a, str) and not a.startswith("'") else a for a in args]
+                    args_str = ", ".join(cleaned_args)
                     body += f"{calls}({args_str});\n"
                     
                 elif action_type == "logging":
@@ -370,8 +402,9 @@ def buildWidget(proj, *args, **kwargs):
                         js_ref_id = sanitize_js_identifier(ref_id)
                         children_code.append(f'{spaces}  {js_ref_id}')
                     elif child_content.get("referenceType") == "prop":
-                        # Prop passed to component (not fully supported in top-level widget yet)
-                        children_code.append(f'{spaces}  props.{ref_id}')
+                        # Clean up self.props and self.state references in prop expressions
+                        ref_id = clean_self_references(ref_id, state_defs.keys())
+                        children_code.append(f'{spaces}  {ref_id}')
                         
                 elif child_type == "element":
                     children_code.append(build_react_element(child, indent + 2, context))
@@ -397,10 +430,9 @@ def buildWidget(proj, *args, **kwargs):
                          # In root component with model, some are local functions
                          val = c.get("id")
                          # Clean up references like "property(this.props)" -> "property(props)"
-                         val = val.replace("this.props", "props").replace("self.props", "props")
-                         # Remove self.state references
-                         if "self.state" in val:
-                             val = val.replace("self.state.", "")
+                         val = val.replace("this.props", "props")
+                         # Clean up self.props and self.state references
+                         val = clean_self_references(val, state_defs.keys())
                          # For simple prop names in custom components that aren't function defs, add props. prefix
                          if context == "custom" and "(" not in val and "props." not in val:
                              # Check if this is a prop definition (function) or a simple prop reference
@@ -482,6 +514,18 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add hooks
     component_body += hooks_code + "\n"
+
+    # Create a self-like object for compatibility with class-component-style prop functions
+    if state_defs or prop_definitions:
+        component_body += "  // Create self object for compatibility with class-style functions\n"
+        component_body += "  const self = {\n"
+        if state_defs:
+            component_body += "    state: {\n"
+            state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in state_defs.keys()]
+            component_body += ",\n".join(state_items)
+            component_body += "\n    },\n"
+        component_body += "    props: {}\n"  # Empty object for root component
+        component_body += "  };\n\n"
 
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
@@ -631,6 +675,8 @@ def buildWidget(proj, *args, **kwargs):
                 ref_content = default_val.get("content", {})
                 if ref_content.get("referenceType") == "prop":
                     ref_id = ref_content.get("id")
+                    # Clean up self.props and self.state references
+                    ref_id = clean_self_references(ref_id, comp_state_defs.keys())
                     custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({ref_id});\n"
                 else:
                     # Fallback to undefined
