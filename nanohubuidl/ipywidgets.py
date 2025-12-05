@@ -6,6 +6,7 @@ import re
 import copy
 
 import ipywidgets as widgets
+import anywidget
 from traitlets import (
     Unicode,
     Integer,
@@ -547,7 +548,18 @@ def buildWidget(proj, *args, **kwargs):
         # Build ESM module
         esm = "\n".join(imports) + "\n\n"
         esm += module_body.strip() + "\n\n"
-        esm += f"export {{ {component_name}Model, {component_name}View }};\n"
+        
+        # Add anywidget bridge
+        # We export the Model and View for reference, but the default export is what anywidget uses
+        esm += f"export {{ {component_name}Model, {component_name}View }};\n\n"
+        
+        # Bridge Backbone View to anywidget render function
+        esm += "export default {\n"
+        esm += "    render({ model, el }) {\n"
+        esm += f"        const view = new {component_name}View({{ model: model, el: el }});\n"
+        esm += "        view.render();\n"
+        esm += "    }\n"
+        esm += "};\n"
         
         return esm
     
@@ -577,40 +589,9 @@ def buildWidget(proj, *args, **kwargs):
             )
         )
         
-        # Wrap JavaScript to ensure RequireJS is available
-        js_wrapped = """
-(function() {
-    // Check if require/define are available
-    if (typeof require !== 'undefined' && typeof define !== 'undefined') {
-        // RequireJS is available, execute the widget code
-        """ + js + """
-    } else {
-        // RequireJS not available - try to wait for it or load it
-        console.warn('RequireJS not immediately available for widget """ + component + """');
+        # anywidget handles JavaScript loading automatically via _esm trait
+        anywidget.AnyWidget.__init__(s, **k)
         
-        // Try waiting a bit for RequireJS to load
-        var checkRequire = function(attempts) {
-            if (typeof require !== 'undefined' && typeof define !== 'undefined') {
-                """ + js + """
-            } else if (attempts > 0) {
-                setTimeout(function() { checkRequire(attempts - 1); }, 100);
-            } else {
-                console.error('RequireJS not available after waiting. Widget """ + component + """ cannot load.');
-                console.error('Please ensure you are running in a Jupyter environment with RequireJS support.');
-            }
-        };
-        checkRequire(50); // Try for 5 seconds
-    }
-})();
-        """
-        
-        # Inject wrapped JavaScript
-        display(Javascript(js_wrapped))
-        
-        widgets.DOMWidget.__init__(s, **k)
-        
-        # Store JS code in widget for potential re-injection
-        s._js_code = js
         for i, j in f.items():
             setattr(s, "_handlers_" + i, widgets.CallbackDispatcher())
             setattr(
@@ -639,41 +620,38 @@ def buildWidget(proj, *args, **kwargs):
         if hasattr(s, "__validate"):
             if n in d:
                 if isinstance(d[n], str):
-                    widgets.DOMWidget.__setattr__(s, n, str(v))
+                    anywidget.AnyWidget.__setattr__(s, n, str(v))
                 elif type(d[n]) == bool:
-                    widgets.DOMWidget.__setattr__(
+                    anywidget.AnyWidget.__setattr__(
                         s,
                         n,
                         v
                         in [True, "true", "True", "on", "yes", "Yes", "TRUE", 1, "ON"],
                     )
                 elif isinstance(d[n], list):
-                    widgets.DOMWidget.__setattr__(s, n, list(v))
+                    anywidget.AnyWidget.__setattr__(s, n, list(v))
                 elif isinstance(d[n], dict):
                     vc = dict(getattr(s, n))
                     vc.update(v)
-                    widgets.DOMWidget.__setattr__(s, n, vc)
+                    anywidget.AnyWidget.__setattr__(s, n, vc)
                 elif isinstance(d[n], int):
-                    widgets.DOMWidget.__setattr__(s, n, int(v))
+                    anywidget.AnyWidget.__setattr__(s, n, int(v))
                 elif isinstance(d[n], float):
-                    widgets.DOMWidget.__setattr__(s, n, float(v))
+                    anywidget.AnyWidget.__setattr__(s, n, float(v))
                 else:
-                    widgets.DOMWidget.__setattr__(s, n, v)
+                    anywidget.AnyWidget.__setattr__(s, n, v)
             else:
-                widgets.DOMWidget.__setattr__(s, n, v)
+                anywidget.AnyWidget.__setattr__(s, n, v)
 
         else:
-            widgets.DOMWidget.__setattr__(s, n, v)
+            anywidget.AnyWidget.__setattr__(s, n, v)
 
-    # Use DOMWidget with embedded JavaScript for remote compatibility
-    # Store the JavaScript code to be injected when widget is displayed
-    attrs["_js_code"] = Unicode(js).tag(sync=True)
+    # Use anywidget for remote compatibility
+    # Store ESM JavaScript module code
+    attrs["_esm"] = Unicode(js_esm).tag(sync=True)
     
-    attrs["_model_name"] = Unicode(component + "Model").tag(sync=True)
-    attrs["_model_module"] = Unicode(component).tag(sync=True)
-    attrs["_view_name"] = Unicode(component + "View").tag(sync=True)
-    attrs["_view_module"] = Unicode(component).tag(sync=True)
-    attrs["_view_module_version"] = Unicode("0.1.0").tag(sync=True)
+    # anywidget handles model/view names automatically (AnyModel/AnyView)
+    # We don't need to set _model_name/_view_name because we are using the render() bridge
     
     attrs["__init__"] = lambda s, **k: do_init(s, default, functions, **k)
     attrs["_handle_uidl_msg"] = lambda s, c, b,: do_handle_msg(
@@ -681,7 +659,7 @@ def buildWidget(proj, *args, **kwargs):
     )
     attrs["__setattr__"] = lambda s, n, v, d=default: do__setattr(s, n, v, d)
 
-    return type(component + "Widget", (widgets.DOMWidget,), attrs)
+    return type(component + "Widget", (anywidget.AnyWidget,), attrs)
 
 
 def parseJSX(document, *args, **kwargs):
