@@ -470,8 +470,55 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "}\n"
 
     # Generate custom component functions
+    # First, determine dependency order (topological sort)
+    # If component A uses component B, B must be defined before A
+    def get_component_dependencies(comp_def):
+        """Find which custom components this component uses"""
+        deps = set()
+        def find_deps(n):
+            content = n.get("content", {})
+            element_type = content.get("elementType") if isinstance(content, dict) else None
+            semantic_type = content.get("semanticType") if isinstance(content, dict) else None
+
+            # Check if this references a custom component
+            if semantic_type in custom_components:
+                deps.add(semantic_type)
+            elif element_type in custom_components:
+                deps.add(element_type)
+
+            # Recurse into children
+            if isinstance(content, dict) and "children" in content:
+                for child in content["children"]:
+                    find_deps(child)
+
+        find_deps(comp_def.get("node", {}))
+        return deps
+
+    # Build dependency graph
+    comp_deps = {name: get_component_dependencies(comp_def)
+                 for name, comp_def in custom_components.items()}
+
+    # Topological sort
+    sorted_components = []
+    visited = set()
+
+    def visit(name):
+        if name in visited:
+            return
+        visited.add(name)
+        # Visit dependencies first
+        for dep in comp_deps.get(name, set()):
+            if dep in custom_components:  # Only visit if it's a custom component
+                visit(dep)
+        sorted_components.append(name)
+
+    for comp_name in custom_components.keys():
+        visit(comp_name)
+
+    # Generate components in dependency order
     custom_component_code = ""
-    for comp_name, comp_def in custom_components.items():
+    for comp_name in sorted_components:
+        comp_def = custom_components[comp_name]
         comp_prop_defs = comp_def.get("propDefinitions", {})
         comp_state_defs = comp_def.get("stateDefinitions", {})
         comp_node = comp_def.get("node", {})
