@@ -488,8 +488,8 @@ def buildWidget(proj, *args, **kwargs):
                 # This fixes "does not provide an export named 'default'" errors
                 if "unpkg.com" in lib_url:
                     # Extract package name and version
-                    # Matches: unpkg.com/package@version/... or unpkg.com/package/...
-                    match = re.search(r"unpkg\.com/(@?[^@/]+)(?:@([^/]+))?", lib_url)
+                    # Matches: unpkg.com/@scope/pkg@version/... or unpkg.com/pkg@version/...
+                    match = re.search(r"unpkg\.com/((?:@[^/]+/[^@/]+)|(?:[^@/]+))(?:@([^/]+))?", lib_url)
                     if match:
                         pkg = match.group(1)
                         ver = match.group(2)
