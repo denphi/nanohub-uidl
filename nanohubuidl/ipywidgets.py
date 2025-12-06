@@ -232,21 +232,23 @@ def buildWidget(proj, *args, **kwargs):
         else:
             dependencies["react-number-format"]["default"] = True
 
-    # Build Imports - use esm.run for proper ESM singleton handling
+    # Build Imports - use CDN with importmap for singleton handling
     js_imports = []
-    js_imports.append('import * as React from "https://esm.run/react@18.2.0";')
-    js_imports.append('import * as ReactDOM from "https://esm.run/react-dom@18.2.0";')
+    # Use default imports for React to ensure proper initialization
+    js_imports.append('import React from "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm";')
+    js_imports.append('import ReactDOM from "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/+esm";')
 
     # Check if Material-UI is used and needs theme provider
     has_material_ui = "@material-ui/core" in dependencies
 
     for path, info in dependencies.items():
-        # Use esm.run for consistent module resolution
-        url = f"https://esm.run/{path}"
+        # Use jsdelivr with ESM flag
+        url = f"https://cdn.jsdelivr.net/npm/{path}"
         if info["version"] and info["version"] != "latest":
             url += f"@{info['version']}"
+        url += "/+esm"
 
-        # esm.run handles peer dependencies automatically
+        # jsdelivr handles peer dependencies
 
         # Handle imports
         import_clauses = []
@@ -270,7 +272,7 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add Material-UI theme support
     if has_material_ui:
-        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://esm.run/@material-ui/core/styles";')
+        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://cdn.jsdelivr.net/npm/@material-ui/core/styles/+esm";')
         js_imports.append('')
         js_imports.append('// Create Material-UI theme')
         js_imports.append('const muiTheme = createMuiTheme();')
