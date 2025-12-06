@@ -340,6 +340,13 @@ def buildWidget(proj, *args, **kwargs):
                             val_expr = new_state[1:]
                             # Clean up self references in expressions
                             val_expr = clean_self_references(val_expr, current_state_defs.keys())
+                            # Handle Object.assign with e.id and e.value - convert to direct object spread
+                            # Child components pass {'prop': value} instead of {id: 'prop', value: value}
+                            if "Object.assign" in val_expr and "[e.id]" in val_expr and "e.value" in val_expr:
+                                # Replace {[e.id]:e.value} with e (direct object spread)
+                                # From: Object.assign({},parameters, {[e.id]:e.value})
+                                # To:   Object.assign({},parameters, e)
+                                val_expr = val_expr.replace("{[e.id]:e.value}", "e")
                         else:
                             val_expr = json.dumps(new_state)
                     else:
