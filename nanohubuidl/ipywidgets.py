@@ -100,7 +100,11 @@ def buildWidget(proj, *args, **kwargs):
     component_name = project.get("name", "MyWidget")
     # Sanitize component name
     component_name = re.sub("[^a-zA-Z0-9]+", "", component_name)
-    
+
+    # Extract custom code from globals if present
+    globals_section = project.get("globals", {})
+    custom_code = globals_section.get("customCode", {}).get("body", "")
+
     root = project.get("root", {})
     state_defs = root.get("stateDefinitions", {})
     prop_defs = root.get("propDefinitions", {})
@@ -237,6 +241,13 @@ def buildWidget(proj, *args, **kwargs):
     # Use React 17 for compatibility with Material-UI v4
     js_imports.append('import * as React from "https://esm.sh/react@17.0.2";')
     js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@17.0.2";')
+
+    # Check for common libraries in custom code and add imports
+    if custom_code:
+        if "LocalForage" in custom_code:
+            js_imports.append('import * as LocalForage from "https://esm.sh/localforage@1.10.0";')
+        if "Axios" in custom_code:
+            js_imports.append('import Axios from "https://esm.sh/axios@1.6.0";')
 
     # Check if Material-UI is used and needs theme provider
     has_material_ui = "@material-ui/core" in dependencies
@@ -773,6 +784,12 @@ def buildWidget(proj, *args, **kwargs):
 
     # Assemble ESM
     esm = "\n".join(js_imports) + "\n\n"
+
+    # Add custom code if present
+    if custom_code:
+        esm += "// Custom code from globals\n"
+        esm += custom_code + "\n\n"
+
     esm += custom_component_code
     esm += component_body + "\n\n"
     esm += "export default {\n"
