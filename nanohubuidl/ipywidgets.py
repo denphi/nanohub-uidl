@@ -242,11 +242,27 @@ def buildWidget(proj, *args, **kwargs):
     js_imports.append('import * as React from "https://esm.sh/react@17.0.2";')
     js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@17.0.2";')
 
-    # Check for common libraries in custom code and add imports
-    if custom_code:
-        if "LocalForage" in custom_code:
+    # Check for common libraries in custom code, prop definitions, and custom components
+    all_code_to_check = custom_code
+    # Check root prop definitions
+    for prop_name, prop_def in prop_defs.items():
+        if prop_def.get("type") == "func":
+            default_val = prop_def.get("defaultValue", "")
+            if isinstance(default_val, str):
+                all_code_to_check += default_val
+    # Check custom component prop definitions
+    for comp_name, comp_def in custom_components.items():
+        comp_prop_defs = comp_def.get("propDefinitions", {})
+        for prop_name, prop_def in comp_prop_defs.items():
+            if prop_def.get("type") == "func":
+                default_val = prop_def.get("defaultValue", "")
+                if isinstance(default_val, str):
+                    all_code_to_check += default_val
+
+    if all_code_to_check:
+        if "LocalForage" in all_code_to_check:
             js_imports.append('import * as LocalForage from "https://esm.sh/localforage@1.10.0";')
-        if "Axios" in custom_code:
+        if "Axios" in all_code_to_check:
             js_imports.append('import Axios from "https://esm.sh/axios@1.6.0";')
 
     # Check if Material-UI is used and needs theme provider
@@ -551,7 +567,17 @@ def buildWidget(proj, *args, **kwargs):
     for prop_name, prop_def in prop_definitions.items():
         if prop_def.get("type") == "func":
             default_val = prop_def.get("defaultValue", "()=>{}")
-            
+
+            # Fix self references in prop functions: self -> _self, self.props -> _self._props
+            if "self" in default_val:
+                # For functions with (self, ...) parameter, rename both parameter and references
+                if re.search(r'\(self,', default_val):
+                    default_val = re.sub(r'\(self,', r'(_self,', default_val)
+                    default_val = re.sub(r'\bself\.props\b', r'_self._props', default_val)
+                    default_val = re.sub(r'\bself\.state\b', r'_self.state', default_val)
+                    # Also handle bare self references (like in callbacks)
+                    default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
+
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
             prop_defs_code += f"  const {prop_name} = (...args) => {{\n"
@@ -592,7 +618,14 @@ def buildWidget(proj, *args, **kwargs):
             state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in state_defs.keys()]
             component_body += ",\n".join(state_items)
             component_body += "\n    },\n"
-        component_body += "    props: {}\n"  # Empty object for root component
+        # Add _props object containing all prop functions for inter-prop-function calls
+        if prop_definitions:
+            component_body += "    _props: {\n"
+            prop_items = [f"      {name}: {name}" for name in prop_definitions.keys()]
+            component_body += ",\n".join(prop_items)
+            component_body += "\n    }\n"
+        else:
+            component_body += "    props: {}\n"  # Empty object if no prop definitions
         component_body += "  };\n\n"
 
     # Effect Hook for State Sync
@@ -715,8 +748,8 @@ def buildWidget(proj, *args, **kwargs):
                 # For functions with (self, ...) parameter, rename both parameter and references
                 if re.search(r'\(self,', default_val):
                     default_val = re.sub(r'\(self,', r'(_self,', default_val)
-                    default_val = re.sub(r'\bself\.props\.', r'_self._props.', default_val)
-                    default_val = re.sub(r'\bself\.state\.', r'_self.state.', default_val)
+                    default_val = re.sub(r'\bself\.props\b', r'_self._props', default_val)
+                    default_val = re.sub(r'\bself\.state\b', r'_self.state', default_val)
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
 
