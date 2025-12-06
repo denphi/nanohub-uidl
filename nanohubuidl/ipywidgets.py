@@ -699,6 +699,9 @@ def buildWidget(proj, *args, **kwargs):
                     custom_component_code += f"  const {prop_name} = props.{prop_name};\n"
 
         # Add state hooks for component state
+        # Track which state variables depend on which props for effect hooks
+        state_prop_dependencies = {}  # {state_name: prop_expression}
+
         for state_name, state_def in comp_state_defs.items():
             js_state_name = sanitize_js_identifier(state_name)
             default_val = state_def.get("defaultValue")
@@ -711,12 +714,32 @@ def buildWidget(proj, *args, **kwargs):
                     # Clean up self.props and self.state references
                     ref_id = clean_self_references(ref_id, comp_state_defs.keys())
                     custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({ref_id});\n"
+                    # Track this dependency for useEffect
+                    state_prop_dependencies[state_name] = ref_id
                 else:
                     # Fallback to undefined
                     custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState(undefined);\n"
             else:
                 # Static default value
                 custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({json.dumps(default_val)});\n"
+
+        # Add useEffect to sync state with prop changes
+        if state_prop_dependencies:
+            custom_component_code += "\n"
+            custom_component_code += "  // Sync state variables when props change\n"
+            custom_component_code += "  React.useEffect(() => {\n"
+            for state_name, prop_expr in state_prop_dependencies.items():
+                js_state_name = sanitize_js_identifier(state_name)
+                custom_component_code += f"    set_{js_state_name}({prop_expr});\n"
+            # Add all referenced props as dependencies
+            # Extract base prop names from expressions like "parameters.mat"
+            prop_deps = set()
+            for prop_expr in state_prop_dependencies.values():
+                # Extract the base prop name (before any dots)
+                base_prop = prop_expr.split('.')[0].split('[')[0]
+                prop_deps.add(base_prop)
+            deps_list = ", ".join(sorted(prop_deps))
+            custom_component_code += f"  }}, [{deps_list}]);\n"
 
         # Add render return
         custom_component_code += "  return (\n"
