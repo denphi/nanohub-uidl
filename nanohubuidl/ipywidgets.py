@@ -232,21 +232,21 @@ def buildWidget(proj, *args, **kwargs):
         else:
             dependencies["react-number-format"]["default"] = True
 
-    # Build Imports
+    # Build Imports - use esm.run for proper ESM singleton handling
     js_imports = []
-    js_imports.append('import * as React from "https://esm.sh/react@18.2.0";')
-    js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0";')
+    js_imports.append('import * as React from "https://esm.run/react@18.2.0";')
+    js_imports.append('import * as ReactDOM from "https://esm.run/react-dom@18.2.0";')
 
     # Check if Material-UI is used and needs theme provider
     has_material_ui = "@material-ui/core" in dependencies
 
     for path, info in dependencies.items():
-        url = f"https://esm.sh/{path}"
+        # Use esm.run for consistent module resolution
+        url = f"https://esm.run/{path}"
         if info["version"] and info["version"] != "latest":
             url += f"@{info['version']}"
 
-        # Force shared React dependency to avoid "Invalid Hook Call" (Error #321)
-        url += "?deps=react@18.2.0"
+        # esm.run handles peer dependencies automatically
 
         # Handle imports
         import_clauses = []
@@ -270,7 +270,7 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add Material-UI theme support
     if has_material_ui:
-        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://esm.sh/@material-ui/core/styles?deps=react@18.2.0";')
+        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://esm.run/@material-ui/core/styles";')
         js_imports.append('')
         js_imports.append('// Create Material-UI theme')
         js_imports.append('const muiTheme = createMuiTheme();')
