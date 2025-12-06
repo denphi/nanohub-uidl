@@ -276,7 +276,15 @@ def buildWidget(proj, *args, **kwargs):
         js_imports.append('const muiTheme = createMuiTheme();')
 
     # Parse Events for Functional Component
-    def parse_events(events_dict):
+    def parse_events(events_dict, is_root_component=True, component_state_defs=None):
+        """
+        Parse event definitions and generate event handlers.
+
+        Args:
+            events_dict: Dictionary of event definitions
+            is_root_component: Whether this is the root component (has access to model)
+            component_state_defs: State definitions for the current component
+        """
         event_handlers = {}
         valid_events = {
             "click": "onClick",
@@ -297,22 +305,25 @@ def buildWidget(proj, *args, **kwargs):
             "load": "onLoad",
         }
 
+        # Use provided state defs or fall back to root state defs
+        current_state_defs = component_state_defs if component_state_defs is not None else state_defs
+
         for ev, actions in events_dict.items():
             handler_name = valid_events.get(ev, ev)
-            
+
             # Build function body
             body = ""
             if isinstance(actions, list):
                 action_list = actions
             else:
                 action_list = [actions]
-                
+
             for action in action_list:
                 if not isinstance(action, dict):
                     continue
-                    
+
                 action_type = action.get("type")
-                
+
                 if action_type == "stateChange":
                     modifies = action.get("modifies")
                     js_modifies = sanitize_js_identifier(modifies)
@@ -326,17 +337,19 @@ def buildWidget(proj, *args, **kwargs):
                         elif new_state.startswith("$"):
                             val_expr = new_state[1:]
                             # Clean up self references in expressions
-                            val_expr = clean_self_references(val_expr, state_defs.keys())
+                            val_expr = clean_self_references(val_expr, current_state_defs.keys())
                         else:
                             val_expr = json.dumps(new_state)
                     else:
                         val_expr = json.dumps(new_state)
 
                     # Generate update code
-                    # set_variable(val); model.set('variable', val); model.save_changes();
+                    # For root component: set_variable(val); model.set('variable', val); model.save_changes();
+                    # For custom components: just set_variable(val);
                     body += f"set_{js_modifies}({val_expr});\n"
-                    body += f"model.set('{modifies}', {val_expr});\n"
-                    body += "model.save_changes();\n"
+                    if is_root_component:
+                        body += f"model.set('{modifies}', {val_expr});\n"
+                        body += "model.save_changes();\n"
 
                 elif action_type == "propCall" or action_type == "propCall2":
                     calls = action.get("calls")
@@ -398,7 +411,9 @@ def buildWidget(proj, *args, **kwargs):
 
         # Events
         events_dict = content.get("events", {}) if isinstance(content, dict) else {}
-        event_handlers = parse_events(events_dict)
+        is_root = (context == "root")
+        current_comp_state_defs = comp_state_defs if comp_state_defs else state_defs
+        event_handlers = parse_events(events_dict, is_root_component=is_root, component_state_defs=current_comp_state_defs)
         for k, v in event_handlers.items():
             props[k] = v
 
