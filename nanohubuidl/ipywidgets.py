@@ -123,7 +123,22 @@ def buildWidget(proj, *args, **kwargs):
     for name, defn in state_defs.items():
         t = defn.get("type", "string")
         default_val = defn.get("defaultValue")
-        
+
+        # Convert dictionary-format options to array format
+        # This handles cases like {"Au-Gold": "Au-Gold", "Ag-Silver": "Ag-Silver"}
+        # and converts them to [{"key": "Au-Gold", "name": "Au-Gold"}, ...]
+        if isinstance(default_val, dict) and (name.endswith("_options") or t in ["array", "list"]):
+            converted_array = []
+            for key, value in default_val.items():
+                if isinstance(value, dict):
+                    # If value is already a dict with icon/name, use it
+                    item = {"key": key, **value}
+                else:
+                    # Simple key-value pair
+                    item = {"key": key, "name": value}
+                converted_array.append(item)
+            default_val = converted_array
+
         # Handle type conversion for default values
         if t == "boolean":
             if isinstance(default_val, str):
