@@ -232,23 +232,23 @@ def buildWidget(proj, *args, **kwargs):
         else:
             dependencies["react-number-format"]["default"] = True
 
-    # Build Imports - use CDN with importmap for singleton handling
+    # Build Imports - use React 17 which Material-UI v4 was designed for
     js_imports = []
-    # Use default imports for React to ensure proper initialization
-    js_imports.append('import React from "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm";')
-    js_imports.append('import ReactDOM from "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/+esm";')
+    # Use React 17 for compatibility with Material-UI v4
+    js_imports.append('import * as React from "https://esm.sh/react@17.0.2";')
+    js_imports.append('import * as ReactDOM from "https://esm.sh/react-dom@17.0.2";')
 
     # Check if Material-UI is used and needs theme provider
     has_material_ui = "@material-ui/core" in dependencies
 
     for path, info in dependencies.items():
-        # Use jsdelivr with ESM flag
-        url = f"https://cdn.jsdelivr.net/npm/{path}"
+        # Use esm.sh with React 17 as peer dependency
+        url = f"https://esm.sh/{path}"
         if info["version"] and info["version"] != "latest":
             url += f"@{info['version']}"
-        url += "/+esm"
 
-        # jsdelivr handles peer dependencies
+        # Force all packages to use React 17
+        url += "?deps=react@17.0.2,react-dom@17.0.2"
 
         # Handle imports
         import_clauses = []
@@ -272,7 +272,7 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add Material-UI theme support
     if has_material_ui:
-        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://cdn.jsdelivr.net/npm/@material-ui/core/styles/+esm";')
+        js_imports.append('import { ThemeProvider as MuiThemeProvider, createMuiTheme } from "https://esm.sh/@material-ui/core/styles?deps=react@17.0.2,react-dom@17.0.2";')
         js_imports.append('')
         js_imports.append('// Create Material-UI theme')
         js_imports.append('const muiTheme = createMuiTheme();')
@@ -770,9 +770,8 @@ def buildWidget(proj, *args, **kwargs):
     esm += component_body + "\n\n"
     esm += "export default {\n"
     esm += "  render({ model, el }) {\n"
-    esm += f"    const root = ReactDOM.createRoot(el);\n"
-    esm += f"    root.render(React.createElement({component_name}, {{ model }}));\n"
-    esm += "    return () => root.unmount();\n"
+    esm += f"    ReactDOM.render(React.createElement({component_name}, {{ model }}), el);\n"
+    esm += "    return () => ReactDOM.unmountComponentAtNode(el);\n"
     esm += "  }\n"
     esm += "};\n"
 
