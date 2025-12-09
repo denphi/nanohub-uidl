@@ -728,6 +728,14 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "    if (typeof window !== 'undefined' && window.location) {\n"
     component_body += "      model.send({ event: '_inject_url', data: window.location.href });\n"
     component_body += "    }\n"
+
+    # Close loader if loader_open state exists
+    if "loader_open" in state_defs:
+        component_body += "    // Close loader after component mounts\n"
+        component_body += "    set_loader_open(false);\n"
+        component_body += "    model.set('loader_open', false);\n"
+        component_body += "    model.save_changes();\n"
+
     component_body += "  }, []);\n\n"
 
     # Render
