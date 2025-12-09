@@ -185,7 +185,7 @@ def _inject_notebook_url():
     """Inject jupyter_notebook_url into IPython kernel namespace"""
     try:
         from IPython import get_ipython
-        from IPython.display import display, Javascript
+        from IPython.display import display, HTML
         import __main__
 
         ipython = get_ipython()
@@ -196,30 +196,60 @@ def _inject_notebook_url():
             # Also inject into __main__ namespace for direct access
             __main__.jupyter_notebook_url = ''
 
-            # Use JavaScript to get the actual URL and update the variable
-            # This works in both classic Notebook and JupyterLab
-            js_code = """
+            # Use a hidden HTML element with inline script for better compatibility
+            # This approach works in Jupyter Notebook 7, JupyterLab, and classic Notebook
+            html_code = """
+            <script>
             (function() {
-                try {
-                    // Try to get kernel reference (works in both classic and Lab)
-                    var kernel = Jupyter.notebook.kernel || IPython.notebook.kernel;
-                    if (kernel) {
-                        kernel.execute("jupyter_notebook_url = '" + window.location.href + "'");
-                    }
-                } catch(e) {
-                    // If Jupyter object doesn't exist, try comm manager approach
-                    try {
-                        var kernel_comm = IPython.notebook.kernel;
-                        if (kernel_comm) {
-                            kernel_comm.execute("jupyter_notebook_url = '" + window.location.href + "'");
-                        }
-                    } catch(e2) {
-                        console.log("Could not inject jupyter_notebook_url: " + e2);
+                // Get the URL
+                var url = window.location.href;
+
+                // Function to execute Python code in the kernel
+                function setNotebookUrl(kernel) {
+                    if (kernel && kernel.execute) {
+                        kernel.execute("jupyter_notebook_url = '" + url + "'");
                     }
                 }
+
+                // Try different approaches to get the kernel
+
+                // Approach 1: Classic Jupyter Notebook (Jupyter object)
+                if (typeof Jupyter !== 'undefined' && Jupyter.notebook && Jupyter.notebook.kernel) {
+                    setNotebookUrl(Jupyter.notebook.kernel);
+                }
+                // Approach 2: Classic Jupyter Notebook (IPython object)
+                else if (typeof IPython !== 'undefined' && IPython.notebook && IPython.notebook.kernel) {
+                    setNotebookUrl(IPython.notebook.kernel);
+                }
+                // Approach 3: JupyterLab / Notebook 7 - use requirejs to access @jupyterlab/services
+                else if (typeof requirejs !== 'undefined') {
+                    requirejs(['base/js/namespace'], function(Jupyter) {
+                        if (Jupyter && Jupyter.notebook && Jupyter.notebook.kernel) {
+                            setNotebookUrl(Jupyter.notebook.kernel);
+                        }
+                    }, function(err) {
+                        // requirejs failed, try alternative approach for Notebook 7/JupyterLab
+                        // In these environments, we'll rely on a comm approach via widgets
+                        console.log("Jupyter Notebook 7/JupyterLab detected - will set URL via comm");
+                    });
+                }
+                // Approach 4: For Notebook 7 - try to access kernel through document API
+                else {
+                    // In Notebook 7, we need to wait for the kernel to be ready
+                    // and use the Jupyter namespace that's loaded asynchronously
+                    setTimeout(function() {
+                        if (window.Jupyter && window.Jupyter.notebook && window.Jupyter.notebook.kernel) {
+                            setNotebookUrl(window.Jupyter.notebook.kernel);
+                        } else if (window._JUPYTERLAB) {
+                            // JupyterLab environment - URL will be set when first widget is created
+                            console.log("JupyterLab environment - URL will be set via widget");
+                        }
+                    }, 100);
+                }
             })();
+            </script>
             """
-            display(Javascript(js_code))
+            display(HTML(html_code))
     except:
         # Silently fail if not in Jupyter/IPython environment
         pass

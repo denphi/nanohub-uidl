@@ -605,6 +605,23 @@ def buildWidget(proj, *args, **kwargs):
         if "event" in content:
             event_name = content["event"]
             data = content.get("data", [])
+
+            # Handle special _inject_url event for Jupyter Notebook 7/JupyterLab
+            if event_name == "_inject_url":
+                try:
+                    from IPython import get_ipython
+                    import __main__
+
+                    ipython = get_ipython()
+                    if ipython is not None and isinstance(data, str):
+                        # Update the jupyter_notebook_url variable
+                        ipython.user_ns['jupyter_notebook_url'] = data
+                        __main__.jupyter_notebook_url = data
+                except:
+                    pass
+                return
+
+            # Handle regular callbacks
             if event_name in self._callbacks:
                 for callback in self._callbacks[event_name]:
                     # Call with unpacked arguments if list, or single arg
@@ -703,6 +720,15 @@ def buildWidget(proj, *args, **kwargs):
         component_body += f"      model.off('change:{name}', update);\n"
     component_body += "    };\n"
     component_body += "  }, [model]);\n\n"
+
+    # Add URL injection effect for Jupyter Notebook 7/JupyterLab compatibility
+    component_body += "  // Inject notebook URL for compatibility (runs once on mount)\n"
+    component_body += "  React.useEffect(() => {\n"
+    component_body += "    // Send the current URL to Python for jupyter_notebook_url variable\n"
+    component_body += "    if (typeof window !== 'undefined' && window.location) {\n"
+    component_body += "      model.send({ event: '_inject_url', data: window.location.href });\n"
+    component_body += "    }\n"
+    component_body += "  }, []);\n\n"
 
     # Render
     if has_material_ui:
