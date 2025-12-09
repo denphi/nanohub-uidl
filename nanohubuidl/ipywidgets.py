@@ -809,6 +809,28 @@ def buildWidget(proj, *args, **kwargs):
             deps_list = ", ".join(sorted(prop_deps))
             custom_component_code += f"  }}, [{deps_list}]);\n"
 
+        # Create self object for custom component prop functions
+        if comp_state_defs or comp_prop_defs:
+            custom_component_code += "\n"
+            custom_component_code += "  // Create self object for compatibility with class-style functions\n"
+            custom_component_code += "  const self = {\n"
+            if comp_state_defs:
+                custom_component_code += "    state: {\n"
+                state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in comp_state_defs.keys()]
+                custom_component_code += ",\n".join(state_items)
+                custom_component_code += "\n    },\n"
+            # Add _props object containing all prop functions for inter-prop-function calls
+            # Get only func-type props
+            func_props = [name for name, defn in comp_prop_defs.items() if defn.get("type") == "func"] if comp_prop_defs else []
+            if func_props:
+                custom_component_code += "    _props: {\n"
+                prop_items = [f"      {name}: {name}" for name in func_props]
+                custom_component_code += ",\n".join(prop_items)
+                custom_component_code += "\n    }\n"
+            else:
+                custom_component_code += "    props: {}\n"
+            custom_component_code += "  };\n"
+
         # Add render return
         custom_component_code += "  return (\n"
         custom_component_code += build_react_element(comp_node, 4, "custom", comp_prop_defs, comp_state_defs)
