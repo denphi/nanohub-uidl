@@ -177,3 +177,31 @@ def main():
             except KeyboardInterrupt:
                 httpd.server_close()
                 print("Nanohub UIDL server has stopped.")
+
+
+# Inject jupyter_notebook_url into the kernel when module is imported
+# This provides compatibility with the old ipywidgets-based implementation
+def _inject_notebook_url():
+    """Inject jupyter_notebook_url into IPython kernel namespace"""
+    try:
+        from IPython import get_ipython
+        from IPython.display import display, Javascript
+
+        ipython = get_ipython()
+        if ipython is not None:
+            # Use JavaScript to get the window location and inject it into Python
+            js_code = """
+            (function() {
+                var kernel = IPython.notebook.kernel;
+                if (kernel) {
+                    kernel.execute("jupyter_notebook_url = '" + window.location.href + "'");
+                }
+            })();
+            """
+            display(Javascript(js_code))
+    except:
+        # Silently fail if not in Jupyter/IPython environment
+        pass
+
+# Call the injection function when module is imported
+_inject_notebook_url()

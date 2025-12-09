@@ -703,7 +703,7 @@ def buildWidget(proj, *args, **kwargs):
         component_body += f"      model.off('change:{name}', update);\n"
     component_body += "    };\n"
     component_body += "  }, [model]);\n\n"
-    
+
     # Render
     if has_material_ui:
         # Wrap with Material-UI ThemeProvider
