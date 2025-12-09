@@ -319,7 +319,9 @@ def buildWidget(proj, *args, **kwargs):
 
     # Add Plotly imports if Plot elementType is used
     if uses_plot:
-        js_imports.append('import Plotly from "https://esm.sh/plotly.js-dist@2.26.0?deps=react@17.0.2,react-dom@17.0.2";')
+        # plotly.js-dist is standalone and doesn't need React deps
+        js_imports.append('import Plotly from "https://esm.sh/plotly.js-dist@2.26.0";')
+        # react-plotly.js/factory needs React deps
         js_imports.append('import createPlotlyComponent from "https://esm.sh/react-plotly.js@2.6.0/factory?deps=react@17.0.2,react-dom@17.0.2";')
 
     # Check if Material-UI is used and needs theme provider
