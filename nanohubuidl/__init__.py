@@ -186,15 +186,36 @@ def _inject_notebook_url():
     try:
         from IPython import get_ipython
         from IPython.display import display, Javascript
+        import __main__
 
         ipython = get_ipython()
         if ipython is not None:
-            # Use JavaScript to get the window location and inject it into Python
+            # Inject into IPython's user namespace (makes it accessible in cells)
+            ipython.user_ns['jupyter_notebook_url'] = ''
+
+            # Also inject into __main__ namespace for direct access
+            __main__.jupyter_notebook_url = ''
+
+            # Use JavaScript to get the actual URL and update the variable
+            # This works in both classic Notebook and JupyterLab
             js_code = """
             (function() {
-                var kernel = IPython.notebook.kernel;
-                if (kernel) {
-                    kernel.execute("jupyter_notebook_url = '" + window.location.href + "'");
+                try {
+                    // Try to get kernel reference (works in both classic and Lab)
+                    var kernel = Jupyter.notebook.kernel || IPython.notebook.kernel;
+                    if (kernel) {
+                        kernel.execute("jupyter_notebook_url = '" + window.location.href + "'");
+                    }
+                } catch(e) {
+                    // If Jupyter object doesn't exist, try comm manager approach
+                    try {
+                        var kernel_comm = IPython.notebook.kernel;
+                        if (kernel_comm) {
+                            kernel_comm.execute("jupyter_notebook_url = '" + window.location.href + "'");
+                        }
+                    } catch(e2) {
+                        console.log("Could not inject jupyter_notebook_url: " + e2);
+                    }
                 }
             })();
             """
