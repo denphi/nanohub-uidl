@@ -179,6 +179,15 @@ def buildWidget(proj, *args, **kwargs):
         # Check for dependency in the node itself (rare) or in its content (common for TeleportElement)
         content = n.get("content", {})
 
+        # Check for expandIcon usage - need Icon component
+        if isinstance(content, dict) and "attrs" in content:
+            attrs = content.get("attrs", {})
+            if "expandIcon" in attrs and isinstance(attrs["expandIcon"], str):
+                # Add Icon to Material-UI core dependencies
+                if "@material-ui/core" not in dependencies:
+                    dependencies["@material-ui/core"] = {"version": "latest", "imports": set(), "default": False}
+                dependencies["@material-ui/core"]["imports"].add("Icon")
+
         # Check content for dependency
         if isinstance(content, dict) and "dependency" in content:
             dep = content["dependency"]
@@ -362,6 +371,14 @@ def buildWidget(proj, *args, **kwargs):
         js_imports.append('')
         js_imports.append('// Create Material-UI theme')
         js_imports.append('const muiTheme = createMuiTheme();')
+        js_imports.append('')
+        js_imports.append('// Load Material Icons font')
+        js_imports.append('const materialIconsLink = document.createElement("link");')
+        js_imports.append('materialIconsLink.href = "https://fonts.googleapis.com/icon?family=Material+Icons";')
+        js_imports.append('materialIconsLink.rel = "stylesheet";')
+        js_imports.append('if (!document.querySelector(\'link[href*="Material+Icons"]\')) {')
+        js_imports.append('  document.head.appendChild(materialIconsLink);')
+        js_imports.append('}')
 
     # Parse Events for Functional Component
     def parse_events(events_dict, is_root_component=True, component_state_defs=None):
@@ -583,7 +600,14 @@ def buildWidget(proj, *args, **kwargs):
                          props_items.append(f'"{k}": {val}')
                          continue
 
-                props_items.append(f'"{k}": {json.dumps(val)}')
+                # Special handling for expandIcon - convert string to Icon element
+                if k == "expandIcon" and isinstance(val, str):
+                    # Make sure Icon is imported
+                    if "@material-ui/core" in dependencies:
+                        dependencies["@material-ui/core"]["imports"].add("Icon")
+                    props_items.append(f'"{k}": React.createElement(Icon, {{}}, "{val}")')
+                else:
+                    props_items.append(f'"{k}": {json.dumps(val)}')
         
         props_str = "{" + ", ".join(props_items) + "}"
         
