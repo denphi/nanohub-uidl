@@ -236,6 +236,27 @@ def buildWidget(proj, *args, **kwargs):
         else:
             dependencies["react-number-format"]["default"] = True
 
+    # Check if Plot elementType is used anywhere (for Plotly charts)
+    def check_for_plot(n):
+        """Recursively check if Plot elementType is used"""
+        content = n.get("content", {})
+        if isinstance(content, dict):
+            if content.get("elementType") == "Plot":
+                return True
+            if "children" in content:
+                for child in content["children"]:
+                    if check_for_plot(child):
+                        return True
+        return False
+
+    uses_plot = check_for_plot(node)
+    # Also check custom components
+    for comp_name, comp_def in custom_components.items():
+        comp_node = comp_def.get("node", {})
+        if check_for_plot(comp_node):
+            uses_plot = True
+            break
+
     # Move Material-UI Lab components from core to lab
     # These components are in @material-ui/lab, not @material-ui/core
     LAB_COMPONENTS = {
@@ -295,6 +316,11 @@ def buildWidget(proj, *args, **kwargs):
             js_imports.append('import * as LocalForage from "https://esm.sh/localforage@1.10.0";')
         if "Axios" in all_code_to_check:
             js_imports.append('import Axios from "https://esm.sh/axios@1.6.0";')
+
+    # Add Plotly imports if Plot elementType is used
+    if uses_plot:
+        js_imports.append('import Plotly from "https://esm.sh/plotly.js-dist@2.26.0?deps=react@17.0.2,react-dom@17.0.2";')
+        js_imports.append('import createPlotlyComponent from "https://esm.sh/react-plotly.js@2.6.0/factory?deps=react@17.0.2,react-dom@17.0.2";')
 
     # Check if Material-UI is used and needs theme provider
     has_material_ui = "@material-ui/core" in dependencies
@@ -738,6 +764,12 @@ def buildWidget(proj, *args, **kwargs):
 
     # Generate components in dependency order
     custom_component_code = ""
+
+    # Create Plot component from Plotly if needed
+    if uses_plot:
+        custom_component_code += "// Create Plot component from Plotly\n"
+        custom_component_code += "const Plot = createPlotlyComponent(Plotly);\n\n"
+
     for comp_name in sorted_components:
         comp_def = custom_components[comp_name]
         comp_prop_defs = comp_def.get("propDefinitions", {})
