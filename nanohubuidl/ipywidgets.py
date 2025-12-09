@@ -236,6 +236,37 @@ def buildWidget(proj, *args, **kwargs):
         else:
             dependencies["react-number-format"]["default"] = True
 
+    # Move Material-UI Lab components from core to lab
+    # These components are in @material-ui/lab, not @material-ui/core
+    LAB_COMPONENTS = {
+        'ToggleButton', 'ToggleButtonGroup', 'Alert', 'AlertTitle',
+        'Autocomplete', 'AvatarGroup', 'Pagination', 'PaginationItem',
+        'Rating', 'Skeleton', 'SpeedDial', 'SpeedDialAction', 'SpeedDialIcon',
+        'Timeline', 'TimelineItem', 'TimelineSeparator', 'TimelineConnector',
+        'TimelineContent', 'TimelineDot', 'TimelineOppositeContent',
+        'TreeView', 'TreeItem'
+    }
+
+    if "@material-ui/core" in dependencies:
+        core_imports = dependencies["@material-ui/core"]["imports"]
+        lab_imports = set()
+
+        # Find components that should be in lab
+        for component in list(core_imports):
+            if component in LAB_COMPONENTS:
+                lab_imports.add(component)
+                core_imports.remove(component)
+
+        # Add lab dependency if we found lab components
+        if lab_imports:
+            if "@material-ui/lab" not in dependencies:
+                dependencies["@material-ui/lab"] = {
+                    "version": "latest",
+                    "imports": set(),
+                    "default": False
+                }
+            dependencies["@material-ui/lab"]["imports"].update(lab_imports)
+
     # Build Imports - use React 17 which Material-UI v4 was designed for
     js_imports = []
     # Use React 17 for compatibility with Material-UI v4
