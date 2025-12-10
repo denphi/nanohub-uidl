@@ -769,21 +769,28 @@ def buildWidget(proj, *args, **kwargs):
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
     component_body += "    console.log('[STATE SYNC DEBUG] Setting up state synchronization...');\n"
-    component_body += "    const update = () => {\n"
-    component_body += "      console.log('[STATE SYNC DEBUG] Model change detected, syncing states...');\n"
+
+    # Create separate listeners for each state to get the actual changed value
     for name in state_defs.keys():
         js_name = sanitize_js_identifier(name)
-        component_body += f"      console.log('[STATE SYNC DEBUG] Updating {name} from model:', model.get('{name}'));\n"
-        component_body += f"      set_{js_name}(model.get('{name}'));\n"
-    component_body += "    };\n"
+        component_body += f"    const update_{js_name} = () => {{\n"
+        component_body += f"      // Use requestAnimationFrame to ensure model is fully updated\n"
+        component_body += f"      requestAnimationFrame(() => {{\n"
+        component_body += f"        const newValue = model.get('{name}');\n"
+        component_body += f"        console.log('[STATE SYNC DEBUG] Change event for {name}, new value:', newValue);\n"
+        component_body += f"        set_{js_name}(newValue);\n"
+        component_body += f"      }});\n"
+        component_body += f"    }};\n"
 
     for name in state_defs.keys():
-        component_body += f"    model.on('change:{name}', update);\n"
+        js_name = sanitize_js_identifier(name)
+        component_body += f"    model.on('change:{name}', update_{js_name});\n"
         component_body += f"    console.log('[STATE SYNC DEBUG] Listening for change:{name}');\n"
 
     component_body += "    return () => {\n"
     for name in state_defs.keys():
-        component_body += f"      model.off('change:{name}', update);\n"
+        js_name = sanitize_js_identifier(name)
+        component_body += f"      model.off('change:{name}', update_{js_name});\n"
     component_body += "    };\n"
     component_body += "  }, [model]);\n\n"
 
