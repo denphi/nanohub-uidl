@@ -946,6 +946,30 @@ def buildWidget(proj, *args, **kwargs):
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
 
+                # Convert setState calls to use state setters for custom components
+                if "setState" in default_val:
+                    def convert_setState(match):
+                        var_name = match.group(1)  # The variable name (self, selfr, e, etc.)
+                        state_obj = match.group(2)  # The state object like {"open":false}
+                        updates = []
+                        state_obj_clean = state_obj.strip()
+                        if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
+                            pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', state_obj_clean)
+                            for key, value in pairs:
+                                # For custom components, use set_stateName
+                                js_key = sanitize_js_identifier(key)
+                                updates.append(f'set_{js_key}({value.strip()})')
+                        if updates:
+                            return '; '.join(updates)
+                        else:
+                            return '/* setState removed - use state setters instead */'
+
+                    default_val = re.sub(
+                        r'(\w+)\.setState\s*\(\s*(\{[^}]+\})\s*\)',
+                        convert_setState,
+                        default_val
+                    )
+
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
 
