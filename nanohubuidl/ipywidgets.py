@@ -734,11 +734,18 @@ def buildWidget(proj, *args, **kwargs):
         hooks_code += f"  const [{js_name}, set_{js_name}] = React.useState(model.get('{name}'));\n"
 
     component_body = f"function {component_name}({{ model }}) {{\n"
+    component_body += "  console.log('[COMPONENT DEBUG] Component rendering...');\n"
+    component_body += "  console.log('[COMPONENT DEBUG] Model object:', model);\n"
+    component_body += "  console.log('[COMPONENT DEBUG] Model.get function:', typeof model.get);\n"
+
     # Add prop definitions
+    component_body += "  console.log('[COMPONENT DEBUG] Defining prop functions...');\n"
     component_body += prop_defs_code + "\n"
 
     # Add hooks
+    component_body += "  console.log('[COMPONENT DEBUG] Creating state hooks...');\n"
     component_body += hooks_code + "\n"
+    component_body += "  console.log('[COMPONENT DEBUG] State hooks created');\n"
 
     # Create a self-like object for compatibility with class-component-style prop functions
     if state_defs or prop_definitions:
@@ -1013,8 +1020,26 @@ def buildWidget(proj, *args, **kwargs):
     esm += component_body + "\n\n"
     esm += "export default {\n"
     esm += "  render({ model, el }) {\n"
-    esm += f"    ReactDOM.render(React.createElement({component_name}, {{ model }}), el);\n"
-    esm += "    return () => ReactDOM.unmountComponentAtNode(el);\n"
+    esm += "    console.log('[RENDER DEBUG] render() called');\n"
+    esm += "    console.log('[RENDER DEBUG] model:', model);\n"
+    esm += "    console.log('[RENDER DEBUG] el:', el);\n"
+    esm += "    try {\n"
+    esm += f"      console.log('[RENDER DEBUG] Creating React element for {component_name}...');\n"
+    esm += f"      const element = React.createElement({component_name}, {{ model }});\n"
+    esm += "      console.log('[RENDER DEBUG] React element created:', element);\n"
+    esm += "      console.log('[RENDER DEBUG] Rendering to DOM...');\n"
+    esm += "      ReactDOM.render(element, el);\n"
+    esm += "      console.log('[RENDER DEBUG] Render complete');\n"
+    esm += "      return () => {\n"
+    esm += "        console.log('[RENDER DEBUG] Unmounting component...');\n"
+    esm += "        ReactDOM.unmountComponentAtNode(el);\n"
+    esm += "      };\n"
+    esm += "    } catch (error) {\n"
+    esm += "      console.error('[RENDER DEBUG] ERROR during render:', error);\n"
+    esm += "      console.error('[RENDER DEBUG] Error stack:', error.stack);\n"
+    esm += "      debugger; // Pause on error\n"
+    esm += "      throw error;\n"
+    esm += "    }\n"
     esm += "  }\n"
     esm += "};\n"
 
