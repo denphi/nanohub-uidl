@@ -746,6 +746,8 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "  console.log('[COMPONENT DEBUG] Creating state hooks...');\n"
     component_body += hooks_code + "\n"
     component_body += "  console.log('[COMPONENT DEBUG] State hooks created');\n"
+    if "loader_open" in state_defs:
+        component_body += "  console.log('[LOADER STATE DEBUG] loader_open value:', loader_open);\n"
 
     # Create a self-like object for compatibility with class-component-style prop functions
     if state_defs or prop_definitions:
