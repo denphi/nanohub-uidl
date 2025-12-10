@@ -1024,6 +1024,22 @@ def buildWidget(proj, *args, **kwargs):
                 custom_component_code += "    props: {}\n"
             custom_component_code += "  };\n"
 
+        # Call onLoad on mount if it exists
+        if "onLoad" in comp_prop_defs:
+            custom_component_code += "\n"
+            custom_component_code += "  // Call onLoad on component mount\n"
+            custom_component_code += "  React.useEffect(() => {\n"
+            custom_component_code += f"    console.log('[{comp_name}] Calling onLoad on mount...');\n"
+            custom_component_code += "    if (typeof onLoad === 'function') {\n"
+            custom_component_code += "      onLoad(self).catch(err => {\n"
+            custom_component_code += f"        console.error('[{comp_name}] onLoad error:', err);\n"
+            custom_component_code += "        if (typeof onError === 'function') {\n"
+            custom_component_code += "          onError(self);\n"
+            custom_component_code += "        }\n"
+            custom_component_code += "      });\n"
+            custom_component_code += "    }\n"
+            custom_component_code += "  }, []);\n"
+
         # Add render return
         custom_component_code += "  return (\n"
         custom_component_code += build_react_element(comp_node, 4, "custom", comp_prop_defs, comp_state_defs)
