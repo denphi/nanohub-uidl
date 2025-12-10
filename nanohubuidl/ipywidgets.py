@@ -806,9 +806,13 @@ def buildWidget(proj, *args, **kwargs):
     if "buildSchema" in prop_definitions:
         component_body += "    // Call buildSchema on component mount to load tool schema\n"
         component_body += "    console.log('[BUILD SCHEMA] Calling buildSchema on mount...');\n"
+        component_body += "    console.log('[BUILD SCHEMA] self object:', self);\n"
+        component_body += "    console.log('[BUILD SCHEMA] self.props:', self ? self.props : 'self is undefined');\n"
+        component_body += "    console.log('[BUILD SCHEMA] buildSchema type:', typeof buildSchema);\n"
         component_body += "    if (typeof buildSchema === 'function') {\n"
         component_body += "      buildSchema(self).catch(err => {\n"
         component_body += "        console.error('[BUILD SCHEMA] Error loading schema:', err);\n"
+        component_body += "        console.error('[BUILD SCHEMA] Error stack:', err.stack);\n"
         component_body += "        // Call onSchemaError if it exists\n"
         component_body += "        if (typeof onSchemaError === 'function') {\n"
         component_body += "          onSchemaError(self);\n"
