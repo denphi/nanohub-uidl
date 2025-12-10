@@ -1012,11 +1012,11 @@ def buildWidget(proj, *args, **kwargs):
                 state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in comp_state_defs.keys()]
                 custom_component_code += ",\n".join(state_items)
                 custom_component_code += "\n    },\n"
-            # Add _props object containing all prop functions for inter-prop-function calls
+            # Add props object containing all prop functions for inter-prop-function calls
             # Get only func-type props
             func_props = [name for name, defn in comp_prop_defs.items() if defn.get("type") == "func"] if comp_prop_defs else []
             if func_props:
-                custom_component_code += "    _props: {\n"
+                custom_component_code += "    props: {\n"
                 prop_items = [f"      {name}: {name}" for name in func_props]
                 custom_component_code += ",\n".join(prop_items)
                 custom_component_code += "\n    }\n"
