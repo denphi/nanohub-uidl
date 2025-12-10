@@ -456,12 +456,12 @@ def buildWidget(proj, *args, **kwargs):
                         val_expr = json.dumps(new_state)
 
                     # Generate update code
-                    # For root component: set_variable(val); model.set('variable', val); model.save_changes();
+                    # For root component: set_variable(val); model.set('variable', val);
                     # For custom components: just set_variable(val);
+                    # Note: model.set() automatically syncs in anywidget, no need for save_changes()
                     body += f"set_{js_modifies}({val_expr});\n"
                     if is_root_component:
                         body += f"model.set('{modifies}', {val_expr});\n"
-                        body += "model.save_changes();\n"
 
                 elif action_type == "propCall" or action_type == "propCall2":
                     calls = action.get("calls")
@@ -756,10 +756,9 @@ def buildWidget(proj, *args, **kwargs):
     # Close loader if loader_open state exists
     if "loader_open" in state_defs:
         component_body += "    // Close loader after component mounts\n"
-        component_body += "    // Update model first, then let state sync update React state\n"
+        component_body += "    // Update model (automatically syncs in anywidget), then state sync updates React\n"
         component_body += "    setTimeout(() => {\n"
         component_body += "      model.set('loader_open', false);\n"
-        component_body += "      model.save_changes();\n"
         component_body += "    }, 100);\n"
 
     component_body += "  }, []);\n\n"
