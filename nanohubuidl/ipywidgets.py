@@ -1028,6 +1028,7 @@ def buildWidget(proj, *args, **kwargs):
     esm += f"      const element = React.createElement({component_name}, {{ model }});\n"
     esm += "      console.log('[RENDER DEBUG] React element created:', element);\n"
     esm += "      console.log('[RENDER DEBUG] Rendering to DOM...');\n"
+    esm += "      debugger;\n"
     esm += "      ReactDOM.render(element, el);\n"
     esm += "      console.log('[RENDER DEBUG] Render complete');\n"
     esm += "      return () => {\n"
