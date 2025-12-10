@@ -761,14 +761,18 @@ def buildWidget(proj, *args, **kwargs):
 
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
+    component_body += "    console.log('[STATE SYNC DEBUG] Setting up state synchronization...');\n"
     component_body += "    const update = () => {\n"
+    component_body += "      console.log('[STATE SYNC DEBUG] Model change detected, syncing states...');\n"
     for name in state_defs.keys():
         js_name = sanitize_js_identifier(name)
+        component_body += f"      console.log('[STATE SYNC DEBUG] Updating {name} from model:', model.get('{name}'));\n"
         component_body += f"      set_{js_name}(model.get('{name}'));\n"
     component_body += "    };\n"
 
     for name in state_defs.keys():
         component_body += f"    model.on('change:{name}', update);\n"
+        component_body += f"    console.log('[STATE SYNC DEBUG] Listening for change:{name}');\n"
 
     component_body += "    return () => {\n"
     for name in state_defs.keys():
@@ -788,8 +792,13 @@ def buildWidget(proj, *args, **kwargs):
     if "loader_open" in state_defs:
         component_body += "    // Close loader after component mounts\n"
         component_body += "    // Update model (automatically syncs in anywidget), then state sync updates React\n"
+        component_body += "    console.log('[LOADER DEBUG] Setting timeout to close loader...');\n"
         component_body += "    setTimeout(() => {\n"
+        component_body += "      console.log('[LOADER DEBUG] Timeout fired! Closing loader...');\n"
+        component_body += "      debugger; // Pause here to inspect state\n"
+        component_body += "      console.log('[LOADER DEBUG] Before model.set - loader_open:', model.get('loader_open'));\n"
         component_body += "      model.set('loader_open', false);\n"
+        component_body += "      console.log('[LOADER DEBUG] After model.set - loader_open:', model.get('loader_open'));\n"
         component_body += "    }, 100);\n"
 
     component_body += "  }, []);\n\n"
