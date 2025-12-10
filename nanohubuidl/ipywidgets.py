@@ -610,11 +610,19 @@ def buildWidget(proj, *args, **kwargs):
                     props_items.append(f'"{k}": {json.dumps(val)}')
         
         props_str = "{" + ", ".join(props_items) + "}"
-        
+
+        # Add debugging for Dialog 'open' prop
+        debug_code = ""
+        if "Dialog" in tag_name and any('"open"' in item for item in props_items):
+            open_prop = next((item.split(": ")[1] for item in props_items if item.startswith('"open"')), None)
+            if open_prop:
+                debug_code = f"(console.log('[DIALOG DEBUG] Creating Dialog with open:', {open_prop}), "
+                props_str = debug_code + props_str + ")"
+
         children_str = ""
         if children_code:
             children_str = ",\n" + ",\n".join(children_code)
-            
+
         return f"{spaces}React.createElement({tag_name}, {props_str}{children_str})"
 
     # Generate Prop Definitions (Local Functions)
