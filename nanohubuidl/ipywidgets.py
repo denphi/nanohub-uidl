@@ -755,11 +755,12 @@ def buildWidget(proj, *args, **kwargs):
 
     # Close loader if loader_open state exists
     if "loader_open" in state_defs:
-        js_loader_open = sanitize_js_identifier("loader_open")
         component_body += "    // Close loader after component mounts\n"
-        component_body += f"    set_{js_loader_open}(false);\n"
-        component_body += "    model.set('loader_open', false);\n"
-        component_body += "    model.save_changes();\n"
+        component_body += "    // Update model first, then let state sync update React state\n"
+        component_body += "    setTimeout(() => {\n"
+        component_body += "      model.set('loader_open', false);\n"
+        component_body += "      model.save_changes();\n"
+        component_body += "    }, 100);\n"
 
     component_body += "  }, []);\n\n"
 
