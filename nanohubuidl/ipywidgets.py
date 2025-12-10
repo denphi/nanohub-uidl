@@ -1062,7 +1062,14 @@ def buildWidget(proj, *args, **kwargs):
     # 3. Final Widget Class
     attrs["_esm"] = Unicode(esm).tag(sync=True)
     attrs.update(python_methods)
-    
+
+    # Prevent ipywidgets from trying to manage layout as a child widget
+    # anywidget doesn't use layout/tooltip/tabbable traits from ipywidgets
+    # Setting them to None prevents ipywidgets manager from trying to create child views
+    attrs["layout"] = None
+    attrs["tooltip"] = None
+    attrs["tabbable"] = None
+
     return type(component_name + "Widget", (anywidget.AnyWidget,), attrs)
 
 
