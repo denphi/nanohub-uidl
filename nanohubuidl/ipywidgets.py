@@ -756,9 +756,9 @@ def buildWidget(proj, *args, **kwargs):
             state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in state_defs.keys()]
             component_body += ",\n".join(state_items)
             component_body += "\n    },\n"
-        # Add _props object containing all prop functions for inter-prop-function calls
+        # Add props object containing all prop functions for inter-prop-function calls
         if prop_definitions:
-            component_body += "    _props: {\n"
+            component_body += "    props: {\n"
             prop_items = [f"      {name}: {name}" for name in prop_definitions.keys()]
             component_body += ",\n".join(prop_items)
             component_body += "\n    }\n"
