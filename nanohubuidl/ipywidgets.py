@@ -678,6 +678,37 @@ def buildWidget(proj, *args, **kwargs):
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
 
+            # Convert old setState syntax to functional component model.set() calls
+            # Pattern: e.setState({"state_name": value}) or _self.setState({"state_name": value})
+            if "setState" in default_val:
+                # This converts class component setState to functional component model.set
+                # We need to extract the state updates and convert them to model.set calls
+                def convert_setState(match):
+                    state_obj = match.group(2)  # The state object like {"loader_open":false}
+
+                    # Parse the state object to extract key-value pairs
+                    # Match patterns like "key":value or 'key':value
+                    updates = []
+                    state_obj_clean = state_obj.strip()
+                    if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
+                        # Extract key-value pairs using regex
+                        pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', state_obj_clean)
+                        for key, value in pairs:
+                            updates.append(f'model.set("{key}", {value.strip()})')
+
+                    if updates:
+                        return '; '.join(updates)
+                    else:
+                        # Fallback: just remove setState call
+                        return '/* setState removed - use model.set() instead */'
+
+                # Replace patterns like: e.setState({"key": value}) or _self.setState(...)
+                default_val = re.sub(
+                    r'(\w+)\.setState\s*\(\s*(\{[^}]+\})\s*\)',
+                    convert_setState,
+                    default_val
+                )
+
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
             prop_defs_code += f"  const {prop_name} = (...args) => {{\n"
