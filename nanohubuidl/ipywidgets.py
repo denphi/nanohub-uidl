@@ -1216,12 +1216,10 @@ def buildWidget(proj, *args, **kwargs):
                 custom_component_code += "\n    },\n"
                 # Add setState method to self object
                 custom_component_code += "    setState: setState,\n"
-            # Add props object containing all prop functions for inter-prop-function calls
-            # Get only func-type props
-            func_props = [name for name, defn in comp_prop_defs.items() if defn.get("type") == "func"] if comp_prop_defs else []
-            if func_props:
+            # Add props object containing ALL props (both function and non-function)
+            if comp_prop_defs:
                 custom_component_code += "    props: {\n"
-                prop_items = [f"      {name}: {name}" for name in func_props]
+                prop_items = [f"      {name}: {name}" for name in comp_prop_defs.keys()]
                 custom_component_code += ",\n".join(prop_items)
                 custom_component_code += "\n    }\n"
             else:
