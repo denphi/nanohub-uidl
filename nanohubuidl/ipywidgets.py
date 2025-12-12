@@ -765,11 +765,10 @@ def buildWidget(proj, *args, **kwargs):
         if prop_def.get("type") == "func":
             default_val = prop_def.get("defaultValue", "()=>{}")
 
-            # Remove literal newlines and extra whitespace from the function string
+            # Remove literal newlines from the function string
             # This prevents "unescaped line break" syntax errors
+            # Keep the spaces to preserve JavaScript syntax
             default_val = default_val.replace('\n', ' ').replace('\r', ' ')
-            # Collapse multiple spaces into single spaces
-            default_val = re.sub(r'\s+', ' ', default_val)
 
             # Fix self references in prop functions: self -> _self, self.props -> _self._props
             if "self" in default_val:
@@ -1047,11 +1046,10 @@ def buildWidget(proj, *args, **kwargs):
             if prop_type == "func":
                 default_val = prop_def.get("defaultValue", "()=>{}")
 
-                # Remove literal newlines and extra whitespace from the function string
+                # Remove literal newlines from the function string
                 # This prevents "unescaped line break" syntax errors
+                # Keep the spaces to preserve JavaScript syntax
                 default_val = default_val.replace('\n', ' ').replace('\r', ' ')
-                # Collapse multiple spaces into single spaces
-                default_val = re.sub(r'\s+', ' ', default_val)
 
                 # Fix naming conflicts: rename parameters and their references
                 # Strategy: For functions with (props) or (self, ...) parameters, rename both
@@ -1148,6 +1146,13 @@ def buildWidget(proj, *args, **kwargs):
                     if comp_name == "AuthSession" and prop_name == "onLoad":
                         print(f"[CUSTOM COMPONENT DEBUG] setState conversion for AuthSession.onLoad")
                         print(f"  Converted code (first 500 chars): {default_val[:500]}")
+
+                # Debug: print final code for AuthSession.onLoad
+                if comp_name == "AuthSession" and prop_name == "onLoad":
+                    print(f"[CUSTOM COMPONENT DEBUG] Final AuthSession.onLoad code:")
+                    print(f"  Length: {len(default_val)} chars")
+                    print(f"  First 1000 chars: {default_val[:1000]}")
+                    print(f"  Last 200 chars: {default_val[-200:]}")
 
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
