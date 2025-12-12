@@ -824,14 +824,41 @@ def buildWidget(proj, *args, **kwargs):
                     state_obj = match.group(2)  # The state object like {"loader_open":false}
 
                     # Parse the state object to extract key-value pairs
-                    # Match patterns like "key":value or 'key':value
                     updates = []
                     state_obj_clean = state_obj.strip()
                     if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                        # Extract key-value pairs using regex
-                        pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', state_obj_clean)
-                        for key, value in pairs:
-                            updates.append(f'model.set("{key}", {value.strip()})')
+                        # Parse key-value pairs, handling quoted string values properly
+                        # Match single-quoted strings
+                        pattern_sq = r"'([^']+)'\s*:\s*'([^']*)'"
+                        # Match double-quoted strings
+                        pattern_dq = r'"([^"]+)"\s*:\s*"([^"]*)"'
+                        # Match quoted key with unquoted value (boolean, number, variable)
+                        pattern_unquoted = r'''["\']([^"\']+)["\']\s*:\s*([^,}\s][^,}]*)'''
+
+                        # Try single-quoted first
+                        for m in re.finditer(pattern_sq, state_obj_clean):
+                            key = m.group(1)
+                            value = m.group(2)
+                            updates.append(f"model.set('{key}', '{value}')")
+
+                        # Then double-quoted
+                        for m in re.finditer(pattern_dq, state_obj_clean):
+                            key = m.group(1)
+                            value = m.group(2)
+                            updates.append(f'model.set("{key}", "{value}")')
+
+                        # Then unquoted values (but skip keys we already processed)
+                        processed_keys = set()
+                        for m in re.finditer(pattern_sq, state_obj_clean):
+                            processed_keys.add(m.group(1))
+                        for m in re.finditer(pattern_dq, state_obj_clean):
+                            processed_keys.add(m.group(1))
+
+                        for m in re.finditer(pattern_unquoted, state_obj_clean):
+                            key = m.group(1)
+                            if key not in processed_keys:
+                                value = m.group(2).strip()
+                                updates.append(f'model.set("{key}", {value})')
 
                     if updates:
                         return '; '.join(updates)
@@ -1124,14 +1151,41 @@ def buildWidget(proj, *args, **kwargs):
                         updates = []
                         state_obj_clean = state_obj.strip()
                         if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                            # Updated regex to handle spaces around colons and commas
-                            # Matches: 'key' : value or "key" : value or 'key': value
-                            # Also handles string values like '' or ""
-                            pairs = re.findall(r'["\']([^"\']+)["\']\s*:\s*([^,}]+?)(?=\s*[,}])', state_obj_clean)
-                            for key, value in pairs:
-                                # For custom components, use set_stateName
+                            # Parse key-value pairs, handling quoted string values properly
+                            # Match single-quoted strings
+                            pattern_sq = r"'([^']+)'\s*:\s*'([^']*)'"
+                            # Match double-quoted strings
+                            pattern_dq = r'"([^"]+)"\s*:\s*"([^"]*)"'
+                            # Match quoted key with unquoted value (boolean, number, variable)
+                            pattern_unquoted = r'''["\']([^"\']+)["\']\s*:\s*([^,}\s][^,}]*)'''
+
+                            # Try single-quoted first
+                            for m in re.finditer(pattern_sq, state_obj_clean):
+                                key = m.group(1)
+                                value = m.group(2)
                                 js_key = sanitize_js_identifier(key)
-                                updates.append(f'set_{js_key}({value.strip()})')
+                                updates.append(f"set_{js_key}('{value}')")
+
+                            # Then double-quoted
+                            for m in re.finditer(pattern_dq, state_obj_clean):
+                                key = m.group(1)
+                                value = m.group(2)
+                                js_key = sanitize_js_identifier(key)
+                                updates.append(f'set_{js_key}("{value}")')
+
+                            # Then unquoted values (but skip keys we already processed)
+                            processed_keys = set()
+                            for m in re.finditer(pattern_sq, state_obj_clean):
+                                processed_keys.add(m.group(1))
+                            for m in re.finditer(pattern_dq, state_obj_clean):
+                                processed_keys.add(m.group(1))
+
+                            for m in re.finditer(pattern_unquoted, state_obj_clean):
+                                key = m.group(1)
+                                if key not in processed_keys:
+                                    value = m.group(2).strip()
+                                    js_key = sanitize_js_identifier(key)
+                                    updates.append(f'set_{js_key}({value})')
                         if updates:
                             return '; '.join(updates)
                         else:
