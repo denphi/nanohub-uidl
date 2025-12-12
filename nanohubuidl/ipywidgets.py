@@ -852,6 +852,15 @@ def buildWidget(proj, *args, **kwargs):
     if "loader_open" in state_defs:
         component_body += "  console.log('[LOADER STATE DEBUG] loader_open value:', loader_open);\n"
 
+    # Create setState helper function first (if we have state)
+    if state_defs:
+        component_body += "  // setState helper for backward compatibility with class components\n"
+        component_body += "  const setState = (updates) => {\n"
+        for name in state_defs.keys():
+            js_name = sanitize_js_identifier(name)
+            component_body += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
+        component_body += "  };\n\n"
+
     # Create a self-like object for compatibility with class-component-style prop functions
     if state_defs or prop_definitions:
         component_body += "  // Create self object for compatibility with class-style functions\n"
@@ -861,6 +870,8 @@ def buildWidget(proj, *args, **kwargs):
             state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in state_defs.keys()]
             component_body += ",\n".join(state_items)
             component_body += "\n    },\n"
+            # Add setState method to self object
+            component_body += "    setState: setState,\n"
         # Add props object containing all prop functions for inter-prop-function calls
         if prop_definitions:
             component_body += "    props: {\n"
@@ -870,15 +881,6 @@ def buildWidget(proj, *args, **kwargs):
         else:
             component_body += "    props: {}\n"  # Empty object if no prop definitions
         component_body += "  };\n\n"
-
-        # Add setState helper function for backward compatibility
-        if state_defs:
-            component_body += "  // setState helper for backward compatibility with class components\n"
-            component_body += "  const setState = (updates) => {\n"
-            for name in state_defs.keys():
-                js_name = sanitize_js_identifier(name)
-                component_body += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
-            component_body += "  };\n\n"
 
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
@@ -1144,6 +1146,16 @@ def buildWidget(proj, *args, **kwargs):
             deps_list = ", ".join(sorted(prop_deps))
             custom_component_code += f"  }}, [{deps_list}]);\n"
 
+        # Create setState helper function first (if we have state)
+        if comp_state_defs:
+            custom_component_code += "\n"
+            custom_component_code += "  // setState helper for backward compatibility with class components\n"
+            custom_component_code += "  const setState = (updates) => {\n"
+            for name in comp_state_defs.keys():
+                js_name = sanitize_js_identifier(name)
+                custom_component_code += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
+            custom_component_code += "  };\n"
+
         # Create self object for custom component prop functions
         if comp_state_defs or comp_prop_defs:
             custom_component_code += "\n"
@@ -1154,6 +1166,8 @@ def buildWidget(proj, *args, **kwargs):
                 state_items = [f"      {name}: {sanitize_js_identifier(name)}" for name in comp_state_defs.keys()]
                 custom_component_code += ",\n".join(state_items)
                 custom_component_code += "\n    },\n"
+                # Add setState method to self object
+                custom_component_code += "    setState: setState,\n"
             # Add props object containing all prop functions for inter-prop-function calls
             # Get only func-type props
             func_props = [name for name, defn in comp_prop_defs.items() if defn.get("type") == "func"] if comp_prop_defs else []
@@ -1165,16 +1179,6 @@ def buildWidget(proj, *args, **kwargs):
             else:
                 custom_component_code += "    props: {}\n"
             custom_component_code += "  };\n"
-
-            # Add setState helper function for backward compatibility
-            if comp_state_defs:
-                custom_component_code += "\n"
-                custom_component_code += "  // setState helper for backward compatibility with class components\n"
-                custom_component_code += "  const setState = (updates) => {\n"
-                for name in comp_state_defs.keys():
-                    js_name = sanitize_js_identifier(name)
-                    custom_component_code += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
-                custom_component_code += "  };\n"
 
         # Call onLoad on mount if it exists
         if "onLoad" in comp_prop_defs:
