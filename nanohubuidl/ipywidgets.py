@@ -884,12 +884,52 @@ def buildWidget(proj, *args, **kwargs):
                         # Fallback: just remove setState call
                         return '/* setState removed - use model.set() instead */'
 
-                # Replace patterns like: e.setState({"key": value}) or _self.setState(...)
-                default_val = re.sub(
-                    r'(\w+)\.setState\s*\(\s*(\{[^}]+\})\s*\)',
-                    convert_setState,
-                    default_val
-                )
+                # Replace patterns like: e.setState({...}) - handle nested braces
+                # We need a custom approach since regex can't handle nested braces
+                import re as re_module
+                result = []
+                pos = 0
+                for match in re_module.finditer(r'(\w+)\.setState\s*\(\s*\{', default_val):
+                    # Add everything before this match
+                    result.append(default_val[pos:match.start()])
+
+                    # Find the matching closing brace
+                    brace_count = 1
+                    i = match.end()
+                    while i < len(default_val) and brace_count > 0:
+                        if default_val[i] == '{':
+                            brace_count += 1
+                        elif default_val[i] == '}':
+                            brace_count -= 1
+                        i += 1
+
+                    # Now find the closing paren
+                    while i < len(default_val) and default_val[i] in ' \t\n\r':
+                        i += 1
+                    if i < len(default_val) and default_val[i] == ')':
+                        # Extract the full match
+                        full_match = default_val[match.start():i+1]
+                        # Create a fake match object for convert_setState
+                        class FakeMatch:
+                            def __init__(self, var, obj):
+                                self._var = var
+                                self._obj = obj
+                            def group(self, n):
+                                return self._var if n == 1 else self._obj
+
+                        var_name = match.group(1)
+                        state_obj = default_val[match.end()-1:i-1]  # From { to }
+                        fake_match = FakeMatch(var_name, state_obj)
+                        result.append(convert_setState(fake_match))
+                        pos = i + 1
+                    else:
+                        # Malformed, keep original
+                        result.append(default_val[match.start():i])
+                        pos = i
+
+                # Add remaining
+                result.append(default_val[pos:])
+                default_val = ''.join(result)
 
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
@@ -1227,11 +1267,50 @@ def buildWidget(proj, *args, **kwargs):
                         else:
                             return '/* setState removed - use state setters instead */'
 
-                    default_val = re.sub(
-                        r'(\w+)\.setState\s*\(\s*(\{[^}]+\})\s*\)',
-                        convert_setState,
-                        default_val
-                    )
+                    # Replace patterns like: e.setState({...}) - handle nested braces
+                    # We need a custom approach since regex can't handle nested braces
+                    import re as re_module
+                    result = []
+                    pos = 0
+                    for match in re_module.finditer(r'(\w+)\.setState\s*\(\s*\{', default_val):
+                        # Add everything before this match
+                        result.append(default_val[pos:match.start()])
+
+                        # Find the matching closing brace
+                        brace_count = 1
+                        i = match.end()
+                        while i < len(default_val) and brace_count > 0:
+                            if default_val[i] == '{':
+                                brace_count += 1
+                            elif default_val[i] == '}':
+                                brace_count -= 1
+                            i += 1
+
+                        # Now find the closing paren
+                        while i < len(default_val) and default_val[i] in ' \t\n\r':
+                            i += 1
+                        if i < len(default_val) and default_val[i] == ')':
+                            # Create a fake match object for convert_setState
+                            class FakeMatch:
+                                def __init__(self, var, obj):
+                                    self._var = var
+                                    self._obj = obj
+                                def group(self, n):
+                                    return self._var if n == 1 else self._obj
+
+                            var_name = match.group(1)
+                            state_obj = default_val[match.end()-1:i]  # From { to }
+                            fake_match = FakeMatch(var_name, state_obj)
+                            result.append(convert_setState(fake_match))
+                            pos = i + 1
+                        else:
+                            # Malformed, keep original
+                            result.append(default_val[match.start():i])
+                            pos = i
+
+                    # Add remaining
+                    result.append(default_val[pos:])
+                    default_val = ''.join(result)
                     # Debug: print conversion result
                     if comp_name == "AuthSession" and prop_name == "onLoad":
                         print(f"[CUSTOM COMPONENT DEBUG] setState conversion for AuthSession.onLoad")
