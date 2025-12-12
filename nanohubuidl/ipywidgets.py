@@ -852,10 +852,6 @@ def buildWidget(proj, *args, **kwargs):
 
             # No need to convert setState - we provide a setState function in the component
 
-            # In root component, convert props. to self.props. for scope access in callbacks
-            # This allows code like (c,m)=>{return props.buildBasis(...)} to work
-            default_val = re.sub(r'\bprops\.', r'self.props.', default_val)
-
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
             prop_defs_code += f"  const {prop_name} = (...args) => {{\n"
