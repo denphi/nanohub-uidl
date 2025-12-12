@@ -767,10 +767,13 @@ def buildWidget(proj, *args, **kwargs):
 
             # Remove literal newlines from the function string
             # This prevents "unescaped line break" syntax errors
-            # Just replace with space - don't add semicolons as they break method chaining
+            # Replace newlines with space first
             default_val = default_val.replace('\n', ' ').replace('\r', ' ')
             # Collapse multiple spaces into single space
             default_val = re.sub(r'\s+', ' ', default_val)
+            # Add semicolon after ) followed by } (end of function call before closing block)
+            # This handles cases like: }).catch(...) }
+            default_val = re.sub(r'\)\s+}', '); }', default_val)
 
             # Fix self references in prop functions: self -> _self, self.props -> _self._props
             if "self" in default_val:
@@ -1100,10 +1103,13 @@ def buildWidget(proj, *args, **kwargs):
 
                 # Remove literal newlines from the function string
                 # This prevents "unescaped line break" syntax errors
-                # Just replace with space - don't add semicolons as they break method chaining
+                # Replace newlines with space first
                 default_val = default_val.replace('\n', ' ').replace('\r', ' ')
                 # Collapse multiple spaces into single space
                 default_val = re.sub(r'\s+', ' ', default_val)
+                # Add semicolon after ) followed by } (end of function call before closing block)
+                # This handles cases like: }).catch(...) }
+                default_val = re.sub(r'\)\s+}', '); }', default_val)
 
                 # Fix naming conflicts: rename parameters and their references
                 # Strategy: For functions with (props) or (self, ...) parameters, rename both
