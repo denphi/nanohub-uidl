@@ -771,9 +771,9 @@ def buildWidget(proj, *args, **kwargs):
             default_val = default_val.replace('\n', ' ').replace('\r', ' ')
             # Collapse multiple spaces into single space
             default_val = re.sub(r'\s+', ' ', default_val)
-            # Add semicolon after ) followed by } (end of function call before closing block)
-            # This handles cases like: }).catch(...) }
-            default_val = re.sub(r'\)\s+}', '); }', default_val)
+            # Add semicolon ONLY after }).catch(...) followed by }
+            # Be very specific to avoid breaking other patterns
+            default_val = re.sub(r'(\.catch\s*\([^)]*\)\s*\{[^}]*\}\s*\))\s+}', r'\1; }', default_val)
 
             # Fix self references in prop functions: self -> _self, self.props -> _self._props
             if "self" in default_val:
@@ -1107,9 +1107,9 @@ def buildWidget(proj, *args, **kwargs):
                 default_val = default_val.replace('\n', ' ').replace('\r', ' ')
                 # Collapse multiple spaces into single space
                 default_val = re.sub(r'\s+', ' ', default_val)
-                # Add semicolon after ) followed by } (end of function call before closing block)
-                # This handles cases like: }).catch(...) }
-                default_val = re.sub(r'\)\s+}', '); }', default_val)
+                # Add semicolon ONLY after }).catch(...) followed by }
+                # Be very specific to avoid breaking other patterns
+                default_val = re.sub(r'(\.catch\s*\([^)]*\)\s*\{[^}]*\}\s*\))\s+}', r'\1; }', default_val)
 
                 # Fix naming conflicts: rename parameters and their references
                 # Strategy: For functions with (props) or (self, ...) parameters, rename both
