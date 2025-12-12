@@ -57,11 +57,8 @@ def buildWidget(proj, *args, **kwargs):
         if not isinstance(expr, str):
             return expr
 
-        # First replace self.props with self.props (keep it as is)
-        # Then replace bare props. with self.props. to fix scope issues in callbacks
-        # We need to be careful: self.props.XXX stays as is, but props.XXX becomes self.props.XXX
-        import re as re_module
-        expr = re_module.sub(r'\bprops\.', r'self.props.', expr)
+        # Don't convert props. to self.props. here - let specific contexts handle it
+        # This prevents "self before initialization" errors
 
         # Replace self.state.variableName with variableName (and sanitize if needed)
         if "self.state." in expr:
@@ -854,6 +851,10 @@ def buildWidget(proj, *args, **kwargs):
                 )
 
             # No need to convert setState - we provide a setState function in the component
+
+            # In root component, convert props. to self.props. for scope access in callbacks
+            # This allows code like (c,m)=>{return props.buildBasis(...)} to work
+            default_val = re.sub(r'\bprops\.', r'self.props.', default_val)
 
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
