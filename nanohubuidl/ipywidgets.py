@@ -765,12 +765,12 @@ def buildWidget(proj, *args, **kwargs):
         if prop_def.get("type") == "func":
             default_val = prop_def.get("defaultValue", "()=>{}")
 
-            # Fix self references in prop functions: self -> _self, self.props -> _self._props
+            # Fix self references in prop functions: self -> _self, self.props -> _self.props
             if "self" in default_val:
                 # For functions with (self, ...) parameter, rename both parameter and references
                 if re.search(r'\(self,', default_val):
                     default_val = re.sub(r'\(self,', r'(_self,', default_val)
-                    default_val = re.sub(r'\bself\.props\b', r'_self._props', default_val)
+                    default_val = re.sub(r'\bself\.props\b', r'_self.props', default_val)
                     default_val = re.sub(r'\bself\.state\b', r'_self.state', default_val)
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
