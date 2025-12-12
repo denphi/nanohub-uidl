@@ -765,6 +765,12 @@ def buildWidget(proj, *args, **kwargs):
         if prop_def.get("type") == "func":
             default_val = prop_def.get("defaultValue", "()=>{}")
 
+            # Remove literal newlines and extra whitespace from the function string
+            # This prevents "unescaped line break" syntax errors
+            default_val = default_val.replace('\n', ' ').replace('\r', ' ')
+            # Collapse multiple spaces into single spaces
+            default_val = re.sub(r'\s+', ' ', default_val)
+
             # Fix self references in prop functions: self -> _self, self.props -> _self._props
             if "self" in default_val:
                 # For functions with (self, ...) parameter, rename both parameter and references
@@ -1040,6 +1046,13 @@ def buildWidget(proj, *args, **kwargs):
 
             if prop_type == "func":
                 default_val = prop_def.get("defaultValue", "()=>{}")
+
+                # Remove literal newlines and extra whitespace from the function string
+                # This prevents "unescaped line break" syntax errors
+                default_val = default_val.replace('\n', ' ').replace('\r', ' ')
+                # Collapse multiple spaces into single spaces
+                default_val = re.sub(r'\s+', ' ', default_val)
+
                 # Fix naming conflicts: rename parameters and their references
                 # Strategy: For functions with (props) or (self, ...) parameters, rename both
                 # the parameter AND its usages within that function scope
