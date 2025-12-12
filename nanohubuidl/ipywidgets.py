@@ -1117,7 +1117,7 @@ def buildWidget(proj, *args, **kwargs):
                 # For functions with (self, ...) parameter, rename both parameter and references
                 if re.search(r'\(self,', default_val):
                     default_val = re.sub(r'\(self,', r'(_self,', default_val)
-                    default_val = re.sub(r'\bself\.props\b', r'_self._props', default_val)
+                    default_val = re.sub(r'\bself\.props\b', r'_self.props', default_val)
                     default_val = re.sub(r'\bself\.state\b', r'_self.state', default_val)
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
