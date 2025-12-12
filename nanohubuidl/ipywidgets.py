@@ -1251,8 +1251,14 @@ def buildWidget(proj, *args, **kwargs):
                 if comp_name == "AuthSession" and prop_name == "onLoad":
                     print(f"[CUSTOM COMPONENT DEBUG] Final AuthSession.onLoad code:")
                     print(f"  Length: {len(default_val)} chars")
-                    print(f"  First 1000 chars: {default_val[:1000]}")
-                    print(f"  Last 200 chars: {default_val[-200:]}")
+                    # Write full code to file for inspection
+                    try:
+                        with open('/tmp/authsession_onload.js', 'w') as f:
+                            f.write(default_val)
+                        print(f"  Full code written to /tmp/authsession_onload.js")
+                    except:
+                        print(f"  First 1000 chars: {default_val[:1000]}")
+                        print(f"  Last 500 chars: {default_val[-500:]}")
 
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
