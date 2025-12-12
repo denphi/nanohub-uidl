@@ -810,126 +810,7 @@ def buildWidget(proj, *args, **kwargs):
                     default_val
                 )
 
-            # Convert old setState syntax to functional component model.set() calls
-            # Pattern: e.setState({"state_name": value}) or _self.setState({"state_name": value})
-            if "setState" in default_val:
-                # This converts class component setState to functional component model.set
-                # We need to extract the state updates and convert them to model.set calls
-                def convert_setState(match):
-                    state_obj = match.group(2)  # The state object like {"loader_open":false}
-
-                    # Parse the state object to extract key-value pairs
-                    updates = []
-                    state_obj_clean = state_obj.strip()
-
-                    if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                        # Remove outer braces
-                        inner = state_obj_clean[1:-1].strip()
-
-                        # Parse key-value pairs by finding commas at the top level
-                        pairs = []
-                        current_pair = []
-                        in_single_quote = False
-                        in_double_quote = False
-                        paren_depth = 0
-
-                        for char in inner:
-                            if char == "'" and not in_double_quote:
-                                in_single_quote = not in_single_quote
-                            elif char == '"' and not in_single_quote:
-                                in_double_quote = not in_double_quote
-                            elif char == '(' and not in_single_quote and not in_double_quote:
-                                paren_depth += 1
-                            elif char == ')' and not in_single_quote and not in_double_quote:
-                                paren_depth -= 1
-                            elif char == ',' and not in_single_quote and not in_double_quote and paren_depth == 0:
-                                # Top-level comma - end of pair
-                                pairs.append(''.join(current_pair).strip())
-                                current_pair = []
-                                continue
-                            current_pair.append(char)
-
-                        # Don't forget the last pair
-                        if current_pair:
-                            pairs.append(''.join(current_pair).strip())
-
-                        # Now parse each pair
-                        for pair in pairs:
-                            # Find the colon (outside quotes)
-                            colon_pos = -1
-                            in_sq = False
-                            in_dq = False
-                            for i, char in enumerate(pair):
-                                if char == "'" and not in_dq:
-                                    in_sq = not in_sq
-                                elif char == '"' and not in_sq:
-                                    in_dq = not in_dq
-                                elif char == ':' and not in_sq and not in_dq:
-                                    colon_pos = i
-                                    break
-
-                            if colon_pos > 0:
-                                key_part = pair[:colon_pos].strip()
-                                value_part = pair[colon_pos+1:].strip()
-
-                                # Extract key (remove quotes)
-                                key = key_part.strip('"\'')
-
-                                # Value is used as-is (preserves expressions)
-                                updates.append(f'model.set("{key}", {value_part})')
-
-                    if updates:
-                        return '; '.join(updates)
-                    else:
-                        # Fallback: just remove setState call
-                        return '/* setState removed - use model.set() instead */'
-
-                # Replace patterns like: e.setState({...}) - handle nested braces
-                # We need a custom approach since regex can't handle nested braces
-                import re as re_module
-                result = []
-                pos = 0
-                for match in re_module.finditer(r'(\w+)\.setState\s*\(\s*\{', default_val):
-                    # Add everything before this match
-                    result.append(default_val[pos:match.start()])
-
-                    # Find the matching closing brace
-                    brace_count = 1
-                    i = match.end()
-                    while i < len(default_val) and brace_count > 0:
-                        if default_val[i] == '{':
-                            brace_count += 1
-                        elif default_val[i] == '}':
-                            brace_count -= 1
-                        i += 1
-
-                    # Now find the closing paren
-                    while i < len(default_val) and default_val[i] in ' \t\n\r':
-                        i += 1
-                    if i < len(default_val) and default_val[i] == ')':
-                        # Extract the full match
-                        full_match = default_val[match.start():i+1]
-                        # Create a fake match object for convert_setState
-                        class FakeMatch:
-                            def __init__(self, var, obj):
-                                self._var = var
-                                self._obj = obj
-                            def group(self, n):
-                                return self._var if n == 1 else self._obj
-
-                        var_name = match.group(1)
-                        state_obj = default_val[match.end()-1:i-1]  # From { to }
-                        fake_match = FakeMatch(var_name, state_obj)
-                        result.append(convert_setState(fake_match))
-                        pos = i + 1
-                    else:
-                        # Malformed, keep original
-                        result.append(default_val[match.start():i])
-                        pos = i
-
-                # Add remaining
-                result.append(default_val[pos:])
-                default_val = ''.join(result)
+            # No need to convert setState - we provide a setState function in the component
 
             # JS: Wrap the function to send message to Python
             # We execute the original logic AND send the event
@@ -989,6 +870,15 @@ def buildWidget(proj, *args, **kwargs):
         else:
             component_body += "    props: {}\n"  # Empty object if no prop definitions
         component_body += "  };\n\n"
+
+        # Add setState helper function for backward compatibility
+        if state_defs:
+            component_body += "  // setState helper for backward compatibility with class components\n"
+            component_body += "  const setState = (updates) => {\n"
+            for name in state_defs.keys():
+                js_name = sanitize_js_identifier(name)
+                component_body += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
+            component_body += "  };\n\n"
 
     # Effect Hook for State Sync
     component_body += "\n  React.useEffect(() => {\n"
@@ -1196,138 +1086,7 @@ def buildWidget(proj, *args, **kwargs):
                         default_val
                     )
 
-                # Convert setState calls to use state setters for custom components
-                if "setState" in default_val:
-                    def convert_setState(match):
-                        var_name = match.group(1)  # The variable name (self, selfr, e, etc.)
-                        state_obj = match.group(2)  # The state object like {"open":false}
-                        updates = []
-                        state_obj_clean = state_obj.strip()
-
-                        if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                            # Remove outer braces
-                            inner = state_obj_clean[1:-1].strip()
-
-                            # Parse key-value pairs by finding commas at the top level
-                            # We need to track quote depth to avoid splitting inside strings
-                            pairs = []
-                            current_pair = []
-                            in_single_quote = False
-                            in_double_quote = False
-                            paren_depth = 0
-
-                            for char in inner:
-                                if char == "'" and not in_double_quote:
-                                    in_single_quote = not in_single_quote
-                                elif char == '"' and not in_single_quote:
-                                    in_double_quote = not in_double_quote
-                                elif char == '(' and not in_single_quote and not in_double_quote:
-                                    paren_depth += 1
-                                elif char == ')' and not in_single_quote and not in_double_quote:
-                                    paren_depth -= 1
-                                elif char == ',' and not in_single_quote and not in_double_quote and paren_depth == 0:
-                                    # Top-level comma - end of pair
-                                    pairs.append(''.join(current_pair).strip())
-                                    current_pair = []
-                                    continue
-                                current_pair.append(char)
-
-                            # Don't forget the last pair
-                            if current_pair:
-                                pairs.append(''.join(current_pair).strip())
-
-                            # Now parse each pair
-                            for pair in pairs:
-                                # Find the colon (outside quotes)
-                                colon_pos = -1
-                                in_sq = False
-                                in_dq = False
-                                for i, char in enumerate(pair):
-                                    if char == "'" and not in_dq:
-                                        in_sq = not in_sq
-                                    elif char == '"' and not in_sq:
-                                        in_dq = not in_dq
-                                    elif char == ':' and not in_sq and not in_dq:
-                                        colon_pos = i
-                                        break
-
-                                if colon_pos > 0:
-                                    key_part = pair[:colon_pos].strip()
-                                    value_part = pair[colon_pos+1:].strip()
-
-                                    # Extract key (remove quotes)
-                                    key = key_part.strip('"\'')
-                                    js_key = sanitize_js_identifier(key)
-
-                                    # Value is used as-is (preserves expressions)
-                                    updates.append(f'set_{js_key}({value_part})')
-
-                        if updates:
-                            return '; '.join(updates)
-                        else:
-                            return '/* setState removed - use state setters instead */'
-
-                    # Replace patterns like: e.setState({...}) - handle nested braces
-                    # We need a custom approach since regex can't handle nested braces
-                    import re as re_module
-                    result = []
-                    pos = 0
-                    for match in re_module.finditer(r'(\w+)\.setState\s*\(\s*\{', default_val):
-                        # Add everything before this match
-                        result.append(default_val[pos:match.start()])
-
-                        # Find the matching closing brace
-                        brace_count = 1
-                        i = match.end()
-                        while i < len(default_val) and brace_count > 0:
-                            if default_val[i] == '{':
-                                brace_count += 1
-                            elif default_val[i] == '}':
-                                brace_count -= 1
-                            i += 1
-
-                        # Now find the closing paren
-                        while i < len(default_val) and default_val[i] in ' \t\n\r':
-                            i += 1
-                        if i < len(default_val) and default_val[i] == ')':
-                            # Create a fake match object for convert_setState
-                            class FakeMatch:
-                                def __init__(self, var, obj):
-                                    self._var = var
-                                    self._obj = obj
-                                def group(self, n):
-                                    return self._var if n == 1 else self._obj
-
-                            var_name = match.group(1)
-                            state_obj = default_val[match.end()-1:i]  # From { to }
-                            fake_match = FakeMatch(var_name, state_obj)
-                            result.append(convert_setState(fake_match))
-                            pos = i + 1
-                        else:
-                            # Malformed, keep original
-                            result.append(default_val[match.start():i])
-                            pos = i
-
-                    # Add remaining
-                    result.append(default_val[pos:])
-                    default_val = ''.join(result)
-                    # Debug: print conversion result
-                    if comp_name == "AuthSession" and prop_name == "onLoad":
-                        print(f"[CUSTOM COMPONENT DEBUG] setState conversion for AuthSession.onLoad")
-                        print(f"  Converted code (first 500 chars): {default_val[:500]}")
-
-                # Debug: print final code for AuthSession.onLoad
-                if comp_name == "AuthSession" and prop_name == "onLoad":
-                    print(f"[CUSTOM COMPONENT DEBUG] Final AuthSession.onLoad code:")
-                    print(f"  Length: {len(default_val)} chars")
-                    # Write full code to file for inspection
-                    try:
-                        with open('/tmp/authsession_onload.js', 'w') as f:
-                            f.write(default_val)
-                        print(f"  Full code written to /tmp/authsession_onload.js")
-                    except:
-                        print(f"  First 1000 chars: {default_val[:1000]}")
-                        print(f"  Last 500 chars: {default_val[-500:]}")
+                # No need to convert setState - we provide a setState function in the component
 
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
@@ -1406,6 +1165,16 @@ def buildWidget(proj, *args, **kwargs):
             else:
                 custom_component_code += "    props: {}\n"
             custom_component_code += "  };\n"
+
+            # Add setState helper function for backward compatibility
+            if comp_state_defs:
+                custom_component_code += "\n"
+                custom_component_code += "  // setState helper for backward compatibility with class components\n"
+                custom_component_code += "  const setState = (updates) => {\n"
+                for name in comp_state_defs.keys():
+                    js_name = sanitize_js_identifier(name)
+                    custom_component_code += f"    if ('{name}' in updates) set_{js_name}(updates['{name}']);\n"
+                custom_component_code += "  };\n"
 
         # Call onLoad on mount if it exists
         if "onLoad" in comp_prop_defs:
