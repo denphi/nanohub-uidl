@@ -609,6 +609,15 @@ def buildWidget(proj, *args, **kwargs):
                 else:
                     props_items.append(f'"{k}": {json.dumps(val)}')
         
+        # For custom components, inject model as a prop so they can use jupyter_axios
+        if semantic_type in custom_components or element_type in custom_components:
+            if context == "root":
+                # In root component, model is available directly
+                props_items.append('"model": model')
+            elif context == "custom":
+                # In custom components, model was passed as props.model
+                props_items.append('"model": props.model')
+
         props_str = "{" + ", ".join(props_items) + "}"
 
         # Add debugging for Dialog 'open' prop
@@ -653,6 +662,61 @@ def buildWidget(proj, *args, **kwargs):
                     pass
                 return
 
+            # Handle HTTP proxy requests for jupyter_axios
+            if event_name == "_http_request":
+                try:
+                    import requests
+
+                    request_id = data.get("id")
+                    url = data.get("url")
+                    method = data.get("method", "GET").upper()
+                    headers = data.get("headers", {})
+                    request_data = data.get("data")
+                    params = data.get("params", {})
+
+                    # Make the HTTP request server-side
+                    response = None
+                    if method == "GET":
+                        response = requests.get(url, params=params, headers=headers)
+                    elif method == "POST":
+                        response = requests.post(url, json=request_data, params=params, headers=headers)
+                    elif method == "PUT":
+                        response = requests.put(url, json=request_data, params=params, headers=headers)
+                    elif method == "DELETE":
+                        response = requests.delete(url, params=params, headers=headers)
+
+                    if response is not None:
+                        # Send response back to JavaScript
+                        self.send({
+                            "event": "_http_response",
+                            "data": {
+                                "id": request_id,
+                                "status": response.status_code,
+                                "statusText": response.reason,
+                                "data": response.text,
+                                "headers": dict(response.headers)
+                            }
+                        })
+                    else:
+                        # Unsupported method
+                        self.send({
+                            "event": "_http_response",
+                            "data": {
+                                "id": request_id,
+                                "error": f"Unsupported HTTP method: {method}"
+                            }
+                        })
+                except Exception as e:
+                    # Send error back to JavaScript
+                    self.send({
+                        "event": "_http_response",
+                        "data": {
+                            "id": request_id,
+                            "error": str(e)
+                        }
+                    })
+                return
+
             # Handle regular callbacks
             if event_name in self._callbacks:
                 for callback in self._callbacks[event_name]:
@@ -685,6 +749,41 @@ def buildWidget(proj, *args, **kwargs):
                     default_val = re.sub(r'\bself\.state\b', r'_self.state', default_val)
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
+
+            # Convert Axios calls to use jupyter_axios proxy
+            # Pattern: Axios.request(url, options) -> jupyter_axios.request(model, url, options)
+            # Pattern: Axios.get(url, ...) -> jupyter_axios.get(model, url, ...)
+            if "Axios." in default_val:
+                # Convert Axios.request to jupyter_axios.request with model as first arg
+                default_val = re.sub(
+                    r'\bAxios\.request\s*\(',
+                    r'jupyter_axios.request(model, ',
+                    default_val
+                )
+                # Convert Axios.get to jupyter_axios.get with model as first arg
+                default_val = re.sub(
+                    r'\bAxios\.get\s*\(',
+                    r'jupyter_axios.get(model, ',
+                    default_val
+                )
+                # Convert Axios.post to jupyter_axios.post with model as first arg
+                default_val = re.sub(
+                    r'\bAxios\.post\s*\(',
+                    r'jupyter_axios.post(model, ',
+                    default_val
+                )
+                # Convert Axios.put to jupyter_axios.put with model as first arg
+                default_val = re.sub(
+                    r'\bAxios\.put\s*\(',
+                    r'jupyter_axios.put(model, ',
+                    default_val
+                )
+                # Convert Axios.delete to jupyter_axios.delete with model as first arg
+                default_val = re.sub(
+                    r'\bAxios\.delete\s*\(',
+                    r'jupyter_axios.delete(model, ',
+                    default_val
+                )
 
             # Convert old setState syntax to functional component model.set() calls
             # Pattern: e.setState({"state_name": value}) or _self.setState({"state_name": value})
@@ -946,6 +1045,40 @@ def buildWidget(proj, *args, **kwargs):
                     # Also handle bare self references (like in callbacks)
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
 
+                # Convert Axios calls to use jupyter_axios proxy for custom components
+                # In custom components, model is available as _props.model
+                if "Axios." in default_val:
+                    # Convert Axios.request to jupyter_axios.request with _props.model as first arg
+                    default_val = re.sub(
+                        r'\bAxios\.request\s*\(',
+                        r'jupyter_axios.request(_props.model, ',
+                        default_val
+                    )
+                    # Convert Axios.get to jupyter_axios.get with _props.model as first arg
+                    default_val = re.sub(
+                        r'\bAxios\.get\s*\(',
+                        r'jupyter_axios.get(_props.model, ',
+                        default_val
+                    )
+                    # Convert Axios.post to jupyter_axios.post with _props.model as first arg
+                    default_val = re.sub(
+                        r'\bAxios\.post\s*\(',
+                        r'jupyter_axios.post(_props.model, ',
+                        default_val
+                    )
+                    # Convert Axios.put to jupyter_axios.put with _props.model as first arg
+                    default_val = re.sub(
+                        r'\bAxios\.put\s*\(',
+                        r'jupyter_axios.put(_props.model, ',
+                        default_val
+                    )
+                    # Convert Axios.delete to jupyter_axios.delete with _props.model as first arg
+                    default_val = re.sub(
+                        r'\bAxios\.delete\s*\(',
+                        r'jupyter_axios.delete(_props.model, ',
+                        default_val
+                    )
+
                 # Convert setState calls to use state setters for custom components
                 if "setState" in default_val:
                     def convert_setState(match):
@@ -1083,6 +1216,88 @@ def buildWidget(proj, *args, **kwargs):
 
     # Assemble ESM
     esm = "\n".join(js_imports) + "\n\n"
+
+    # Add jupyter_axios proxy for server-side HTTP requests
+    esm += "// jupyter_axios: Custom Axios implementation using Python kernel for HTTP requests\n"
+    esm += "// This bypasses CORS by making requests server-side through the Jupyter kernel\n"
+    esm += "const jupyter_axios = (() => {\n"
+    esm += "  let requestCounter = 0;\n"
+    esm += "  const pendingRequests = new Map();\n"
+    esm += "\n"
+    esm += "  // Setup response listener (will be called once when model is available)\n"
+    esm += "  const setupListener = (model) => {\n"
+    esm += "    if (setupListener.initialized) return;\n"
+    esm += "    setupListener.initialized = true;\n"
+    esm += "\n"
+    esm += "    model.on('msg:custom', (msg) => {\n"
+    esm += "      if (msg.event === '_http_response') {\n"
+    esm += "        const { id, status, statusText, data, headers, error } = msg.data;\n"
+    esm += "        const pending = pendingRequests.get(id);\n"
+    esm += "        if (pending) {\n"
+    esm += "          pendingRequests.delete(id);\n"
+    esm += "          if (error) {\n"
+    esm += "            pending.reject(new Error(error));\n"
+    esm += "          } else {\n"
+    esm += "            // Parse JSON if content-type indicates it\n"
+    esm += "            let parsedData = data;\n"
+    esm += "            const contentType = headers && headers['content-type'] || headers && headers['Content-Type'] || '';\n"
+    esm += "            if (contentType.includes('application/json')) {\n"
+    esm += "              try {\n"
+    esm += "                parsedData = JSON.parse(data);\n"
+    esm += "              } catch (e) {\n"
+    esm += "                console.warn('[jupyter_axios] Failed to parse JSON response:', e);\n"
+    esm += "              }\n"
+    esm += "            }\n"
+    esm += "            pending.resolve({\n"
+    esm += "              status,\n"
+    esm += "              statusText,\n"
+    esm += "              data: parsedData,\n"
+    esm += "              headers\n"
+    esm += "            });\n"
+    esm += "          }\n"
+    esm += "        }\n"
+    esm += "      }\n"
+    esm += "    });\n"
+    esm += "  };\n"
+    esm += "\n"
+    esm += "  const request = (model, url, options = {}) => {\n"
+    esm += "    console.log('[jupyter_axios] Making request:', url, options);\n"
+    esm += "    setupListener(model);\n"
+    esm += "\n"
+    esm += "    const requestId = ++requestCounter;\n"
+    esm += "    const method = options.method || 'GET';\n"
+    esm += "    const headers = options.headers || {};\n"
+    esm += "    const data = options.data;\n"
+    esm += "    const params = options.params || {};\n"
+    esm += "\n"
+    esm += "    return new Promise((resolve, reject) => {\n"
+    esm += "      pendingRequests.set(requestId, { resolve, reject });\n"
+    esm += "\n"
+    esm += "      // Send request to Python\n"
+    esm += "      model.send({\n"
+    esm += "        event: '_http_request',\n"
+    esm += "        data: {\n"
+    esm += "          id: requestId,\n"
+    esm += "          url,\n"
+    esm += "          method,\n"
+    esm += "          headers,\n"
+    esm += "          data,\n"
+    esm += "          params\n"
+    esm += "        }\n"
+    esm += "      });\n"
+    esm += "    });\n"
+    esm += "  };\n"
+    esm += "\n"
+    esm += "  // Return axios-compatible API\n"
+    esm += "  return {\n"
+    esm += "    request: (model, url, options) => request(model, url, options),\n"
+    esm += "    get: (model, url, options = {}) => request(model, url, { ...options, method: 'GET' }),\n"
+    esm += "    post: (model, url, data, options = {}) => request(model, url, { ...options, method: 'POST', data }),\n"
+    esm += "    put: (model, url, data, options = {}) => request(model, url, { ...options, method: 'PUT', data }),\n"
+    esm += "    delete: (model, url, options = {}) => request(model, url, { ...options, method: 'DELETE' })\n"
+    esm += "  };\n"
+    esm += "})();\n"
+    esm += "\n"
 
     # Add custom code if present
     if custom_code:
