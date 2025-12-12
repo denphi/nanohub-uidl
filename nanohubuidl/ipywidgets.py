@@ -57,8 +57,11 @@ def buildWidget(proj, *args, **kwargs):
         if not isinstance(expr, str):
             return expr
 
-        # Replace self.props with props
-        expr = expr.replace("self.props", "props")
+        # First replace self.props with self.props (keep it as is)
+        # Then replace bare props. with self.props. to fix scope issues in callbacks
+        # We need to be careful: self.props.XXX stays as is, but props.XXX becomes self.props.XXX
+        import re as re_module
+        expr = re_module.sub(r'\bprops\.', r'self.props.', expr)
 
         # Replace self.state.variableName with variableName (and sanitize if needed)
         if "self.state." in expr:
@@ -362,6 +365,9 @@ def buildWidget(proj, *args, **kwargs):
             js_imports.append('import * as LocalForage from "https://esm.sh/localforage@1.10.0";')
         if "Axios" in all_code_to_check:
             js_imports.append('import Axios from "https://esm.sh/axios@1.6.0";')
+        if "math." in all_code_to_check or "math(" in all_code_to_check:
+            # math.js library for mathematical operations
+            js_imports.append('import * as math from "https://esm.sh/mathjs@11.11.0";')
 
     # Add Plotly imports if Plot elementType is used
     if uses_plot:
