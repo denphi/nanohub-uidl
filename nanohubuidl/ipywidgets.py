@@ -1113,7 +1113,10 @@ def buildWidget(proj, *args, **kwargs):
                         updates = []
                         state_obj_clean = state_obj.strip()
                         if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                            pairs = re.findall(r'["\']([^"\']+)["\']:\s*([^,}]+)', state_obj_clean)
+                            # Updated regex to handle spaces around colons and commas
+                            # Matches: 'key' : value or "key" : value or 'key': value
+                            # Also handles string values like '' or ""
+                            pairs = re.findall(r'["\']([^"\']+)["\']\s*:\s*([^,}]+?)(?=\s*[,}])', state_obj_clean)
                             for key, value in pairs:
                                 # For custom components, use set_stateName
                                 js_key = sanitize_js_identifier(key)
@@ -1128,6 +1131,10 @@ def buildWidget(proj, *args, **kwargs):
                         convert_setState,
                         default_val
                     )
+                    # Debug: print conversion result
+                    if comp_name == "AuthSession" and prop_name == "onLoad":
+                        print(f"[CUSTOM COMPONENT DEBUG] setState conversion for AuthSession.onLoad")
+                        print(f"  Converted code (first 500 chars): {default_val[:500]}")
 
                 # Wrap the default function in parentheses to avoid ambiguity with ||
                 custom_component_code += f"  const {prop_name} = props.{prop_name} || ({default_val});\n"
