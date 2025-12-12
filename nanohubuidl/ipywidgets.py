@@ -674,14 +674,24 @@ def buildWidget(proj, *args, **kwargs):
                     request_data = data.get("data")
                     params = data.get("params", {})
 
+                    # Determine if data should be sent as form-encoded or JSON
+                    content_type = headers.get("Content-Type", headers.get("content-type", ""))
+
                     # Make the HTTP request server-side
                     response = None
                     if method == "GET":
                         response = requests.get(url, params=params, headers=headers)
                     elif method == "POST":
-                        response = requests.post(url, json=request_data, params=params, headers=headers)
+                        # If content-type is form-encoded and data is a string, send as data
+                        if "application/x-www-form-urlencoded" in content_type and isinstance(request_data, str):
+                            response = requests.post(url, data=request_data, params=params, headers=headers)
+                        else:
+                            response = requests.post(url, json=request_data, params=params, headers=headers)
                     elif method == "PUT":
-                        response = requests.put(url, json=request_data, params=params, headers=headers)
+                        if "application/x-www-form-urlencoded" in content_type and isinstance(request_data, str):
+                            response = requests.put(url, data=request_data, params=params, headers=headers)
+                        else:
+                            response = requests.put(url, json=request_data, params=params, headers=headers)
                     elif method == "DELETE":
                         response = requests.delete(url, params=params, headers=headers)
 
