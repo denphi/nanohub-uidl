@@ -1173,6 +1173,11 @@ def buildWidget(proj, *args, **kwargs):
                     ref_id = ref_content.get("id")
                     # Clean up self.props and self.state references
                     ref_id = clean_self_references(ref_id, comp_state_defs.keys())
+                    # Also replace self.props.XXX with just XXX (local constants) in custom components
+                    # since self isn't defined yet when state hooks are created
+                    if comp_prop_defs:
+                        for prop_name in comp_prop_defs.keys():
+                            ref_id = re.sub(rf'\bself\.props\.{prop_name}\b', prop_name, ref_id)
                     custom_component_code += f"  const [{js_state_name}, set_{js_state_name}] = React.useState({ref_id});\n"
                     # Track this dependency for useEffect
                     state_prop_dependencies[state_name] = ref_id
