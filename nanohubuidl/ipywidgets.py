@@ -826,39 +826,62 @@ def buildWidget(proj, *args, **kwargs):
                     # Parse the state object to extract key-value pairs
                     updates = []
                     state_obj_clean = state_obj.strip()
+
                     if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                        # Parse key-value pairs, handling quoted string values properly
-                        # Match single-quoted strings
-                        pattern_sq = r"'([^']+)'\s*:\s*'([^']*)'"
-                        # Match double-quoted strings
-                        pattern_dq = r'"([^"]+)"\s*:\s*"([^"]*)"'
-                        # Match quoted key with unquoted value (boolean, number, variable)
-                        pattern_unquoted = r'''["\']([^"\']+)["\']\s*:\s*([^,}\s][^,}]*)'''
+                        # Remove outer braces
+                        inner = state_obj_clean[1:-1].strip()
 
-                        # Try single-quoted first
-                        for m in re.finditer(pattern_sq, state_obj_clean):
-                            key = m.group(1)
-                            value = m.group(2)
-                            updates.append(f"model.set('{key}', '{value}')")
+                        # Parse key-value pairs by finding commas at the top level
+                        pairs = []
+                        current_pair = []
+                        in_single_quote = False
+                        in_double_quote = False
+                        paren_depth = 0
 
-                        # Then double-quoted
-                        for m in re.finditer(pattern_dq, state_obj_clean):
-                            key = m.group(1)
-                            value = m.group(2)
-                            updates.append(f'model.set("{key}", "{value}")')
+                        for char in inner:
+                            if char == "'" and not in_double_quote:
+                                in_single_quote = not in_single_quote
+                            elif char == '"' and not in_single_quote:
+                                in_double_quote = not in_double_quote
+                            elif char == '(' and not in_single_quote and not in_double_quote:
+                                paren_depth += 1
+                            elif char == ')' and not in_single_quote and not in_double_quote:
+                                paren_depth -= 1
+                            elif char == ',' and not in_single_quote and not in_double_quote and paren_depth == 0:
+                                # Top-level comma - end of pair
+                                pairs.append(''.join(current_pair).strip())
+                                current_pair = []
+                                continue
+                            current_pair.append(char)
 
-                        # Then unquoted values (but skip keys we already processed)
-                        processed_keys = set()
-                        for m in re.finditer(pattern_sq, state_obj_clean):
-                            processed_keys.add(m.group(1))
-                        for m in re.finditer(pattern_dq, state_obj_clean):
-                            processed_keys.add(m.group(1))
+                        # Don't forget the last pair
+                        if current_pair:
+                            pairs.append(''.join(current_pair).strip())
 
-                        for m in re.finditer(pattern_unquoted, state_obj_clean):
-                            key = m.group(1)
-                            if key not in processed_keys:
-                                value = m.group(2).strip()
-                                updates.append(f'model.set("{key}", {value})')
+                        # Now parse each pair
+                        for pair in pairs:
+                            # Find the colon (outside quotes)
+                            colon_pos = -1
+                            in_sq = False
+                            in_dq = False
+                            for i, char in enumerate(pair):
+                                if char == "'" and not in_dq:
+                                    in_sq = not in_sq
+                                elif char == '"' and not in_sq:
+                                    in_dq = not in_dq
+                                elif char == ':' and not in_sq and not in_dq:
+                                    colon_pos = i
+                                    break
+
+                            if colon_pos > 0:
+                                key_part = pair[:colon_pos].strip()
+                                value_part = pair[colon_pos+1:].strip()
+
+                                # Extract key (remove quotes)
+                                key = key_part.strip('"\'')
+
+                                # Value is used as-is (preserves expressions)
+                                updates.append(f'model.set("{key}", {value_part})')
 
                     if updates:
                         return '; '.join(updates)
@@ -1150,42 +1173,65 @@ def buildWidget(proj, *args, **kwargs):
                         state_obj = match.group(2)  # The state object like {"open":false}
                         updates = []
                         state_obj_clean = state_obj.strip()
+
                         if state_obj_clean.startswith('{') and state_obj_clean.endswith('}'):
-                            # Parse key-value pairs, handling quoted string values properly
-                            # Match single-quoted strings
-                            pattern_sq = r"'([^']+)'\s*:\s*'([^']*)'"
-                            # Match double-quoted strings
-                            pattern_dq = r'"([^"]+)"\s*:\s*"([^"]*)"'
-                            # Match quoted key with unquoted value (boolean, number, variable)
-                            pattern_unquoted = r'''["\']([^"\']+)["\']\s*:\s*([^,}\s][^,}]*)'''
+                            # Remove outer braces
+                            inner = state_obj_clean[1:-1].strip()
 
-                            # Try single-quoted first
-                            for m in re.finditer(pattern_sq, state_obj_clean):
-                                key = m.group(1)
-                                value = m.group(2)
-                                js_key = sanitize_js_identifier(key)
-                                updates.append(f"set_{js_key}('{value}')")
+                            # Parse key-value pairs by finding commas at the top level
+                            # We need to track quote depth to avoid splitting inside strings
+                            pairs = []
+                            current_pair = []
+                            in_single_quote = False
+                            in_double_quote = False
+                            paren_depth = 0
 
-                            # Then double-quoted
-                            for m in re.finditer(pattern_dq, state_obj_clean):
-                                key = m.group(1)
-                                value = m.group(2)
-                                js_key = sanitize_js_identifier(key)
-                                updates.append(f'set_{js_key}("{value}")')
+                            for char in inner:
+                                if char == "'" and not in_double_quote:
+                                    in_single_quote = not in_single_quote
+                                elif char == '"' and not in_single_quote:
+                                    in_double_quote = not in_double_quote
+                                elif char == '(' and not in_single_quote and not in_double_quote:
+                                    paren_depth += 1
+                                elif char == ')' and not in_single_quote and not in_double_quote:
+                                    paren_depth -= 1
+                                elif char == ',' and not in_single_quote and not in_double_quote and paren_depth == 0:
+                                    # Top-level comma - end of pair
+                                    pairs.append(''.join(current_pair).strip())
+                                    current_pair = []
+                                    continue
+                                current_pair.append(char)
 
-                            # Then unquoted values (but skip keys we already processed)
-                            processed_keys = set()
-                            for m in re.finditer(pattern_sq, state_obj_clean):
-                                processed_keys.add(m.group(1))
-                            for m in re.finditer(pattern_dq, state_obj_clean):
-                                processed_keys.add(m.group(1))
+                            # Don't forget the last pair
+                            if current_pair:
+                                pairs.append(''.join(current_pair).strip())
 
-                            for m in re.finditer(pattern_unquoted, state_obj_clean):
-                                key = m.group(1)
-                                if key not in processed_keys:
-                                    value = m.group(2).strip()
+                            # Now parse each pair
+                            for pair in pairs:
+                                # Find the colon (outside quotes)
+                                colon_pos = -1
+                                in_sq = False
+                                in_dq = False
+                                for i, char in enumerate(pair):
+                                    if char == "'" and not in_dq:
+                                        in_sq = not in_sq
+                                    elif char == '"' and not in_sq:
+                                        in_dq = not in_dq
+                                    elif char == ':' and not in_sq and not in_dq:
+                                        colon_pos = i
+                                        break
+
+                                if colon_pos > 0:
+                                    key_part = pair[:colon_pos].strip()
+                                    value_part = pair[colon_pos+1:].strip()
+
+                                    # Extract key (remove quotes)
+                                    key = key_part.strip('"\'')
                                     js_key = sanitize_js_identifier(key)
-                                    updates.append(f'set_{js_key}({value})')
+
+                                    # Value is used as-is (preserves expressions)
+                                    updates.append(f'set_{js_key}({value_part})')
+
                         if updates:
                             return '; '.join(updates)
                         else:
