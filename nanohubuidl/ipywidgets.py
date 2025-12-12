@@ -609,14 +609,14 @@ def buildWidget(proj, *args, **kwargs):
                 else:
                     props_items.append(f'"{k}": {json.dumps(val)}')
         
-        # For custom components, inject model as a prop so they can use jupyter_axios
+        # For custom components, inject model so they can use jupyter_axios
         if semantic_type in custom_components or element_type in custom_components:
             if context == "root":
                 # In root component, model is available directly
                 props_items.append('"model": model')
             elif context == "custom":
-                # In custom components, model was passed as props.model
-                props_items.append('"model": props.model')
+                # In custom components, model was passed as a prop
+                props_items.append('"model": model')
 
         props_str = "{" + ", ".join(props_items) + "}"
 
@@ -1006,7 +1006,8 @@ def buildWidget(proj, *args, **kwargs):
         comp_node = comp_def.get("node", {})
 
         # Start component function
-        custom_component_code += f"function {comp_name}(props) {{\n"
+        # Accept both props and model so custom components can use jupyter_axios
+        custom_component_code += f"function {comp_name}({{ model, ...props }}) {{\n"
 
         # Add prop definitions as local variables
         for prop_name, prop_def in comp_prop_defs.items():
@@ -1046,36 +1047,36 @@ def buildWidget(proj, *args, **kwargs):
                     default_val = re.sub(r'\bself\b(?!\.)', r'_self', default_val)
 
                 # Convert Axios calls to use jupyter_axios proxy for custom components
-                # In custom components, model is available as _props.model
+                # In custom components, model is available directly via destructured parameter
                 if "Axios." in default_val:
-                    # Convert Axios.request to jupyter_axios.request with _props.model as first arg
+                    # Convert Axios.request to jupyter_axios.request with model as first arg
                     default_val = re.sub(
                         r'\bAxios\.request\s*\(',
-                        r'jupyter_axios.request(_props.model, ',
+                        r'jupyter_axios.request(model, ',
                         default_val
                     )
-                    # Convert Axios.get to jupyter_axios.get with _props.model as first arg
+                    # Convert Axios.get to jupyter_axios.get with model as first arg
                     default_val = re.sub(
                         r'\bAxios\.get\s*\(',
-                        r'jupyter_axios.get(_props.model, ',
+                        r'jupyter_axios.get(model, ',
                         default_val
                     )
-                    # Convert Axios.post to jupyter_axios.post with _props.model as first arg
+                    # Convert Axios.post to jupyter_axios.post with model as first arg
                     default_val = re.sub(
                         r'\bAxios\.post\s*\(',
-                        r'jupyter_axios.post(_props.model, ',
+                        r'jupyter_axios.post(model, ',
                         default_val
                     )
-                    # Convert Axios.put to jupyter_axios.put with _props.model as first arg
+                    # Convert Axios.put to jupyter_axios.put with model as first arg
                     default_val = re.sub(
                         r'\bAxios\.put\s*\(',
-                        r'jupyter_axios.put(_props.model, ',
+                        r'jupyter_axios.put(model, ',
                         default_val
                     )
-                    # Convert Axios.delete to jupyter_axios.delete with _props.model as first arg
+                    # Convert Axios.delete to jupyter_axios.delete with model as first arg
                     default_val = re.sub(
                         r'\bAxios\.delete\s*\(',
-                        r'jupyter_axios.delete(_props.model, ',
+                        r'jupyter_axios.delete(model, ',
                         default_val
                     )
 
