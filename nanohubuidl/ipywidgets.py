@@ -674,6 +674,14 @@ def buildWidget(proj, *args, **kwargs):
                     request_data = data.get("data")
                     params = data.get("params", {})
 
+                    # Debug logging
+                    print(f"[PROXY DEBUG] HTTP Request:")
+                    print(f"  URL: {url}")
+                    print(f"  Method: {method}")
+                    print(f"  Headers: {headers}")
+                    print(f"  Data type: {type(request_data)}")
+                    print(f"  Data: {request_data}")
+
                     # Determine if data should be sent as form-encoded or JSON
                     content_type = headers.get("Content-Type", headers.get("content-type", ""))
 
@@ -684,8 +692,10 @@ def buildWidget(proj, *args, **kwargs):
                     elif method == "POST":
                         # If content-type is form-encoded and data is a string, send as data
                         if "application/x-www-form-urlencoded" in content_type and isinstance(request_data, str):
+                            print(f"[PROXY DEBUG] Sending as form-encoded data")
                             response = requests.post(url, data=request_data, params=params, headers=headers)
                         else:
+                            print(f"[PROXY DEBUG] Sending as JSON")
                             response = requests.post(url, json=request_data, params=params, headers=headers)
                     elif method == "PUT":
                         if "application/x-www-form-urlencoded" in content_type and isinstance(request_data, str):
@@ -696,6 +706,11 @@ def buildWidget(proj, *args, **kwargs):
                         response = requests.delete(url, params=params, headers=headers)
 
                     if response is not None:
+                        print(f"[PROXY DEBUG] Response:")
+                        print(f"  Status: {response.status_code}")
+                        print(f"  Reason: {response.reason}")
+                        print(f"  Text: {response.text[:500]}")  # First 500 chars
+
                         # Send response back to JavaScript
                         self.send({
                             "event": "_http_response",
@@ -1241,24 +1256,30 @@ def buildWidget(proj, *args, **kwargs):
     esm += "    setupListener.initialized = true;\n"
     esm += "\n"
     esm += "    model.on('msg:custom', (msg) => {\n"
+    esm += "      console.log('[jupyter_axios] Received message:', msg);\n"
     esm += "      if (msg.event === '_http_response') {\n"
     esm += "        const { id, status, statusText, data, headers, error } = msg.data;\n"
+    esm += "        console.log('[jupyter_axios] Response received:', { id, status, statusText, error, dataLength: data ? data.length : 0 });\n"
     esm += "        const pending = pendingRequests.get(id);\n"
     esm += "        if (pending) {\n"
     esm += "          pendingRequests.delete(id);\n"
     esm += "          if (error) {\n"
+    esm += "            console.error('[jupyter_axios] Request failed with error:', error);\n"
     esm += "            pending.reject(new Error(error));\n"
     esm += "          } else {\n"
     esm += "            // Parse JSON if content-type indicates it\n"
     esm += "            let parsedData = data;\n"
     esm += "            const contentType = headers && headers['content-type'] || headers && headers['Content-Type'] || '';\n"
+    esm += "            console.log('[jupyter_axios] Content-Type:', contentType);\n"
     esm += "            if (contentType.includes('application/json')) {\n"
     esm += "              try {\n"
     esm += "                parsedData = JSON.parse(data);\n"
+    esm += "                console.log('[jupyter_axios] Parsed JSON:', parsedData);\n"
     esm += "              } catch (e) {\n"
     esm += "                console.warn('[jupyter_axios] Failed to parse JSON response:', e);\n"
     esm += "              }\n"
     esm += "            }\n"
+    esm += "            console.log('[jupyter_axios] Resolving promise with:', { status, statusText, data: parsedData });\n"
     esm += "            pending.resolve({\n"
     esm += "              status,\n"
     esm += "              statusText,\n"
@@ -1266,6 +1287,8 @@ def buildWidget(proj, *args, **kwargs):
     esm += "              headers\n"
     esm += "            });\n"
     esm += "          }\n"
+    esm += "        } else {\n"
+    esm += "          console.warn('[jupyter_axios] No pending request found for id:', id);\n"
     esm += "        }\n"
     esm += "      }\n"
     esm += "    });\n"
