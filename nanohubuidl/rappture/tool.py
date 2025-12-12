@@ -594,7 +594,7 @@ def buildSchema(tp, Component, *args, **kwargs):
     js += "          var labelt = '';" + eol
     js += "          if (about.length > 0){" + eol
     js += (
-        "            var description = elem.getElementsByTagName('description');"
+        "            description = elem.getElementsByTagName('description');"
         + eol
     )
     js += "            if (description.length > 0){" + eol

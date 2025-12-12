@@ -170,6 +170,43 @@ def buildWidget(proj, *args, **kwargs):
             defaults[name] = str(default_val) if default_val is not None else ""
             attrs[name] = Unicode(defaults[name]).tag(sync=True)
 
+    # Also create traitlets for non-function prop definitions
+    # These are props like data, layout, planes that should be accessible via self.props
+    for name, defn in prop_defs.items():
+        # Skip function-type props - they're handled differently
+        if defn.get("type") == "func":
+            continue
+
+        t = defn.get("type", "string")
+        default_val = defn.get("defaultValue")
+
+        # Handle type conversion for default values (same as state)
+        if t == "boolean":
+            if isinstance(default_val, str):
+                default_val = default_val.lower() in ["true", "on", "yes", "1"]
+            defaults[name] = bool(default_val) if default_val is not None else False
+            attrs[name] = Bool(defaults[name]).tag(sync=True)
+
+        elif t == "number":
+            defaults[name] = float(default_val) if default_val is not None else 0.0
+            attrs[name] = Float(defaults[name]).tag(sync=True)
+
+        elif t == "integer":
+            defaults[name] = int(default_val) if default_val is not None else 0
+            attrs[name] = Integer(defaults[name]).tag(sync=True)
+
+        elif t == "array":
+            defaults[name] = list(default_val) if default_val is not None else []
+            attrs[name] = List(defaults[name]).tag(sync=True)
+
+        elif t == "object":
+            defaults[name] = dict(default_val) if default_val is not None else {}
+            attrs[name] = Dict(defaults[name]).tag(sync=True)
+
+        else: # string
+            defaults[name] = str(default_val) if default_val is not None else ""
+            attrs[name] = Unicode(defaults[name]).tag(sync=True)
+
     # 2. JavaScript Generation
 
     # Collect dependencies
@@ -841,9 +878,20 @@ def buildWidget(proj, *args, **kwargs):
     component_body += "  console.log('[COMPONENT DEBUG] Model object:', model);\n"
     component_body += "  console.log('[COMPONENT DEBUG] Model.get function:', typeof model.get);\n"
 
-    # Add prop definitions
+    # Add prop definitions (functions)
     component_body += "  console.log('[COMPONENT DEBUG] Defining prop functions...');\n"
     component_body += prop_defs_code + "\n"
+
+    # Add non-function props as constants from model
+    non_func_props_code = ""
+    for prop_name, prop_def in prop_definitions.items():
+        if prop_def.get("type") != "func":
+            # Non-function props are stored in the model (traitlets)
+            non_func_props_code += f"  const {prop_name} = model.get('{prop_name}');\n"
+
+    if non_func_props_code:
+        component_body += "  console.log('[COMPONENT DEBUG] Getting non-function props from model...');\n"
+        component_body += non_func_props_code + "\n"
 
     # Add hooks
     component_body += "  console.log('[COMPONENT DEBUG] Creating state hooks...');\n"
