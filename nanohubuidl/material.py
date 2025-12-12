@@ -951,7 +951,7 @@ class MaterialComponents:
         )
         IComponent.addPropVariable("label", {"type": "string", "defaultValue": ""})
         IComponent.addPropVariable(
-            "descripption", {"type": "string", "defaultValue": ""}
+            "description", {"type": "string", "defaultValue": ""}
         )
         IComponent.addPropVariable(
             "onChange", {"type": "func", "defaultValue": "(e)=>{}"}
