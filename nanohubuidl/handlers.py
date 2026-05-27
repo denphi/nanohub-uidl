@@ -42,6 +42,19 @@ import PIL
 
 REQUEST_TIMEOUT = 30
 SCHEMA_CACHE_TTL = 60
+SIMTOOL_ENV_KEYS = [
+    "DISPLAY",
+    "SESSIONDIR",
+    "RESULTSDIR",
+    "SESSION",
+    "LANG",
+    "LANGUAGE",
+    "LC_ALL",
+    "TIMEOUT",
+    "SUBMIT_JOB",
+    "RAPPTURE_CACHE_SQUID",
+    "SIM2L_CACHE_SQUID",
+]
 
 class Singleton(object):
     _instance = None
@@ -372,6 +385,7 @@ class SubmitLocal(Singleton):
                     self.basepath,
                     self.jobspath,
                     self.squidmap,
+                    {k: os.environ[k] for k in SIMTOOL_ENV_KEYS if k in os.environ},
                     jobid,
                     simToolLocation,
                     inputs,
@@ -444,6 +458,7 @@ class SubmitLocal(Singleton):
             self.basepath,
             self.jobspath,
             self.squidmap,
+            {k: os.environ[k] for k in SIMTOOL_ENV_KEYS if k in os.environ},
             jobid,
             simToolLocation,
             inputs,
@@ -451,16 +466,15 @@ class SubmitLocal(Singleton):
         )
 
     @staticmethod
-    def runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs):
+    def runJobState(basepath, jobspath, squidmap, env, jobid, simToolLocation, inputs, outputs):
         jobpath = os.path.join(jobspath, "_" + str(jobid))
         try:
             with open(
                 os.path.join(jobspath, "." + str(jobid)), "a", buffering=1
             ) as sys.stdout:
                 with sys.stdout as sys.stderr:
-                    with open(os.devnull, "r") as devnull:
-                        os.dup2(devnull.fileno(), 0)
-                        SubmitLocal._runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs)
+                    os.environ.update(env)
+                    SubmitLocal._runJobState(basepath, jobspath, squidmap, env, jobid, simToolLocation, inputs, outputs)
         except Exception as e:
             traceback.print_exc()
             error = {"message": str(e), "code": 500}
@@ -474,7 +488,7 @@ class SubmitLocal(Singleton):
         return
 
     @staticmethod
-    def _runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs):
+    def _runJobState(basepath, jobspath, squidmap, env, jobid, simToolLocation, inputs, outputs):
         jobpath = os.path.join(jobspath, "_" + str(jobid))
         try:
             dictionary = {}
@@ -482,6 +496,7 @@ class SubmitLocal(Singleton):
             print("UIDL worker pid = " + str(os.getpid()))
             print("UIDL worker cwd = " + str(os.getcwd()))
             print("UIDL jobpath = " + str(jobpath))
+            print("UIDL env keys = " + json.dumps(sorted(env.keys())))
             print("UIDL outputs requested = " + json.dumps(outputs))
             print("UIDL input keys = " + json.dumps(list(inputs.keys())))
             r = Run(simToolLocation, inputs, "_" + str(jobid))
