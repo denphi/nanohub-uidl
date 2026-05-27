@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Run a simtool through the same Python path used by nanohubuidl handlers.
+
+This intentionally calls simtool.Run directly, so it is useful for debugging
+the handoff from simtool to ionhelper without the UIDL HTTP server/browser loop.
+"""
+import argparse
+import json
+import os
+import sys
+import time
+import traceback
+
+from simtool import Run, getSimToolInputs, searchForSimTool
+from simtool.utils import getParamsFromDictionary
+
+
+ENV_KEYS = [
+    "DISPLAY",
+    "SESSIONDIR",
+    "RESULTSDIR",
+    "SESSION",
+    "LANG",
+    "LANGUAGE",
+    "LC_ALL",
+    "TIMEOUT",
+    "SUBMIT_JOB",
+    "RAPPTURE_CACHE_SQUID",
+    "SIM2L_CACHE_SQUID",
+]
+
+
+def load_inputs(path):
+    with open(path, "r") as infile:
+        text = infile.read()
+
+    if path.endswith(".json"):
+        data = json.loads(text)
+    else:
+        try:
+            import yaml
+        except ImportError:
+            print("PyYAML is required to read YAML input files.", file=sys.stderr)
+            raise
+        data = yaml.safe_load(text)
+
+    if isinstance(data, dict) and "inputs" in data and isinstance(data["inputs"], dict):
+        return data["inputs"]
+    return data
+
+
+def print_env():
+    print("debug_simtool_run pid =", os.getpid())
+    print("debug_simtool_run cwd =", os.getcwd())
+    print("debug_simtool_run env =")
+    for key in ENV_KEYS:
+        print("  {0}={1}".format(key, os.environ.get(key, "<missing>")))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Debug simtool.Run with the same conversion path used by nanohubuidl."
+    )
+    parser.add_argument("tool", help="SimTool name, e.g. st4pnjunction")
+    parser.add_argument("revision", help="Revision number or r-prefixed revision, e.g. 15 or r15")
+    parser.add_argument("inputs", help="Path to inputs.yaml or inputs.json")
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Run directory name. Defaults to _debug_<timestamp>.",
+    )
+    parser.add_argument(
+        "--outputs",
+        default="",
+        help="Comma-separated outputs to read after Run returns. Defaults to all saved outputs.",
+    )
+    args = parser.parse_args()
+
+    revision = str(args.revision)
+    if revision == "0":
+        sim_revision = None
+    elif revision.startswith("r"):
+        sim_revision = revision
+    else:
+        sim_revision = "r" + revision
+
+    run_name = args.run_name or "_debug_{0}".format(int(time.time()))
+
+    print_env()
+    print("tool =", args.tool)
+    print("revision =", sim_revision)
+    print("inputs file =", os.path.abspath(args.inputs))
+    print("run name =", run_name)
+
+    raw_inputs = load_inputs(args.inputs)
+    print("raw input keys =", sorted(raw_inputs.keys()))
+
+    sim_location = searchForSimTool(args.tool, sim_revision)
+    print("simToolLocation =", sim_location)
+    if sim_location.get("notebookPath") is None:
+        raise RuntimeError("Tool not found")
+
+    schema = getSimToolInputs(sim_location)
+    print("schema input keys =", sorted(schema.keys()))
+    params = getParamsFromDictionary(schema, raw_inputs)
+    print("converted input keys =", sorted(params.keys()))
+
+    print("calling Run(...)")
+    try:
+        run = Run(sim_location, params, run_name)
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt while waiting inside Run(...)", file=sys.stderr)
+        raise
+    except Exception:
+        print("Run(...) raised:", file=sys.stderr)
+        traceback.print_exc()
+        raise
+
+    print("Run returned")
+    saved_outputs = run.db.getSavedOutputs()
+    print("saved outputs =", saved_outputs)
+
+    requested = [o.strip() for o in args.outputs.split(",") if o.strip()]
+    output_names = requested or saved_outputs
+    for output in output_names:
+        try:
+            value = run.read(output)
+            print("output {0}: {1}".format(output, type(value).__name__))
+        except Exception:
+            print("failed to read output {0}".format(output), file=sys.stderr)
+            traceback.print_exc()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
