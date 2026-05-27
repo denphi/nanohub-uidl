@@ -40,6 +40,9 @@ import tempfile
 from PIL import Image
 import PIL
 
+REQUEST_TIMEOUT = 30
+SCHEMA_CACHE_TTL = 60
+
 class Singleton(object):
     _instance = None
     def __new__(class_, *args, **kwargs):
@@ -49,6 +52,11 @@ class Singleton(object):
 
 class SubmitLocal(Singleton):
     def __init__(self, *args, jobspath=None, **kwargs):
+        if getattr(self, "_initialized", False):
+            if jobspath is not None and os.path.abspath(jobspath) != os.path.abspath(self.jobspath):
+                raise ValueError("SubmitLocal is already initialized with a different jobspath")
+            return
+        self._initialized = True
         self.basepath = os.getcwd()
         if "RESULTSDIR" in os.environ:
             self.basepath = os.environ["RESULTSDIR"]
@@ -63,6 +71,11 @@ class SubmitLocal(Singleton):
         manager = Manager()
         self.squidmap = manager.dict()
         self.squiddb = ""
+        self.session = None
+        self.http_session = requests.Session()
+        self._schema_cache = {}
+        self._input_schema_cache = {}
+        self._final_status_cache = {}
         for subdir, dirs, files in os.walk(jobspath):
             for file in files:
                 if file == ".squidid":
@@ -86,7 +99,26 @@ class SubmitLocal(Singleton):
                 }
                 self.session = nr.Session(auth_data)
 
-    def handle(self, url, data={}):
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("http_session", None)
+        state.pop("session", None)
+        state.pop("_schema_cache", None)
+        state.pop("_input_schema_cache", None)
+        state.pop("_final_status_cache", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.session = None
+        self.http_session = requests.Session()
+        self._schema_cache = {}
+        self._input_schema_cache = {}
+        self._final_status_cache = {}
+
+    def handle(self, url, data=None):
+        if data is None:
+            data = {}
         obj = Response()
         if "api/developer/oauth/token" in url:
             obj = self.authTask(data)
@@ -132,53 +164,133 @@ class SubmitLocal(Singleton):
             obj.status_code = 404
         return obj
 
-    def schemaTask(self, tool, revision):
-        tool = tool.replace("+","/")
-        obj = Response()
+    def _revision_key(self, revision):
+        if revision is None:
+            return None
+        revision = str(revision)
+        if revision == "0":
+            return None
+        if revision.startswith("r"):
+            return revision
+        return "r" + revision
+
+    def _tool_cache_key(self, tool, revision):
+        return (tool.replace("+", "/"), self._revision_key(revision))
+
+    def _cache_get(self, cache, key):
+        cached = cache.get(key)
+        if cached is None:
+            return None
+        cached_at, value = cached
+        if time.time() - cached_at > SCHEMA_CACHE_TTL:
+            cache.pop(key, None)
+            return None
+        return value
+
+    def _cache_set(self, cache, key, value):
+        cache[key] = (time.time(), value)
+        return value
+
+    def _tool_mtime(self, location):
+        path = location.get("notebookPath")
+        if path is None or not os.path.exists(path):
+            return None
+        return os.path.getmtime(path)
+
+    def _get_tool_location(self, tool, revision):
+        key = self._tool_cache_key(tool, revision)
+        cached = self._cache_get(self._schema_cache, key)
+        if cached is not None:
+            location, mtime = cached
+            if mtime == self._tool_mtime(location):
+                return location
+            self._schema_cache.pop(key, None)
+            self._schema_cache.pop(("response", key), None)
+            self._input_schema_cache.pop(key, None)
+        location = searchForSimTool(key[0], key[1])
+        return self._cache_set(self._schema_cache, key, (location, self._tool_mtime(location)))[0]
+
+    def _get_input_schema(self, tool, revision, location):
+        key = self._tool_cache_key(tool, revision)
+        cached = self._cache_get(self._input_schema_cache, key)
+        if cached is not None:
+            inputs, mtime = cached
+            if mtime == self._tool_mtime(location):
+                return inputs
+            self._input_schema_cache.pop(key, None)
+        inputs = getSimToolInputs(location)
+        return self._cache_set(self._input_schema_cache, key, (inputs, self._tool_mtime(location)))[0]
+
+    def _schema_response(self, tool, revision):
+        key = self._tool_cache_key(tool, revision)
+        simToolLocation = self._get_tool_location(tool, revision)
+        if simToolLocation["notebookPath"] is None:
+            return None
+
+        cached = self._cache_get(self._schema_cache, ("response", key))
+        if cached is not None:
+            response, mtime = cached
+            if mtime == self._tool_mtime(simToolLocation):
+                return response
+            self._schema_cache.pop(("response", key), None)
+
+        inputs = self._get_input_schema(tool, revision, simToolLocation)
+        outputs = getSimToolOutputs(simToolLocation)
+        response = {
+            "inputs": self._json_safe_schema(inputs),
+            "outputs": self._json_safe_schema(outputs),
+            "message": None,
+            "success": True,
+            "state": "published" if simToolLocation["published"] else "installed",
+            "name": str(key[0]),
+            "revision": str(simToolLocation["simToolRevision"]).replace("r", ""),
+            "path": simToolLocation["notebookPath"],
+            "type": "simtool",
+        }
+        return self._cache_set(self._schema_cache, ("response", key), (response, self._tool_mtime(simToolLocation)))[0]
+
+    def _json_safe_schema(self, schema):
         response = {}
+        for k in schema:
+            response[k] = {}
+            for k2 in schema[k]:
+                try:
+                    json.dumps(schema[k][k2])
+                    response[k][k2] = schema[k][k2]
+                except:
+                    response[k][k2] = str(schema[k][k2])
+        return response
+
+    def _serialize_output(self, output):
+        try:
+            json.dumps(output)
+            return output
+        except:
+            if isinstance(output, PIL.Image.Image):
+                buffered = io.BytesIO()
+                iformat = "PNG"
+                imime = "image/png"
+                if output.format is not None:
+                    iformat = output.format
+                    imime = output.get_format_mimetype()
+                output.save(buffered, format=iformat)
+                return "data:" + imime + ";base64," + base64.b64encode(buffered.getvalue()).decode()
+            if isinstance(output, (bytes, bytearray)):
+                return "data:application/octet-stream;base64," + base64.b64encode(output).decode()
+            raise
+
+    def schemaTask(self, tool, revision):
+        obj = Response()
         t = time.time()
-        simToolName = tool
-        simToolRevision = revision
-        if simToolRevision is not None:
-            simToolRevision = "r"+str(simToolRevision)
-        simToolLocation = searchForSimTool(simToolName, simToolRevision)
-        if(simToolLocation["notebookPath"] is None):
+        response = self._schema_response(tool, revision)
+        if response is None:
             obj = Response()
             obj._content = bytes("Tool not Found", "utf8")
             obj.status_code = 404
             return obj;
-        
-        inputs = getSimToolInputs(simToolLocation)
-        outputs = getSimToolOutputs(simToolLocation)
-        response["inputs"] = {}
-        for k in inputs:
-            response["inputs"][k] = {}
-            for k2 in inputs[k]:
-                try:
-                    json.dumps(inputs[k][k2])
-                    response["inputs"][k][k2] = inputs[k][k2]
-                except:
-                    response["inputs"][k][k2] = str(inputs[k][k2])
-        response["outputs"] = {}
-        for k in outputs:
-            response["outputs"][k] = {}
-            for k2 in outputs[k]:
-                try:
-                    json.dumps(outputs[k][k2])
-                    response["outputs"][k][k2] = outputs[k][k2]
-                except:
-                    response["outputs"][k][k2] = str(outputs[k][k2])
-        response["message"] = None
+
+        response = response.copy()
         response["response_time"] = time.time() - t
-        response["success"] = True
-        if simToolLocation["published"]:
-            response["state"] = "published"
-        else:
-            response["state"] = "installed"
-        response["name"] = str(simToolName)
-        response["revision"] = str(simToolLocation["simToolRevision"]).replace("r", "")
-        response["path"] = simToolLocation["notebookPath"]
-        response["type"] = "simtool"
 
         obj.status_code = 200
         obj._content = bytes(json.dumps({"tool": response}), "utf8")
@@ -196,10 +308,7 @@ class SubmitLocal(Singleton):
         t = time.time()
         simToolName = request["name"].replace("+","/")
         simToolRevision = request["revision"]
-        if simToolRevision is not None:
-            simToolRevision = "r"+str(simToolRevision)
-        simToolLocation = searchForSimTool(simToolName, simToolRevision)
-        print(simToolLocation)
+        simToolLocation = self._get_tool_location(simToolName, simToolRevision)
         if(simToolLocation["notebookPath"] is None):
             obj = Response()
             obj._content = bytes("Tool not Found", "utf8")
@@ -212,7 +321,7 @@ class SubmitLocal(Singleton):
         else:
             simToolRevision = "r" + request["revision"]
 
-        inputsSchema = getSimToolInputs(simToolLocation)
+        inputsSchema = self._get_input_schema(simToolName, request["revision"], simToolLocation)
         
         for k,v in request["inputs"].items():
             if isinstance(v, str) and v.startswith('base64://'):
@@ -228,6 +337,7 @@ class SubmitLocal(Singleton):
         inputs = getParamsFromDictionary(inputsSchema, request["inputs"])
         hashableInputs = _get_inputs_cache_dict(inputs)
         response["userinputs"] = _get_inputs_dict(inputs)
+        squid = None
         try:
             ds = simtool.datastore.WSDataStore(
                 simToolName, simToolRevision, hashableInputs, self.squiddb
@@ -263,7 +373,8 @@ class SubmitLocal(Singleton):
             response["message"] = ""
             response["status"] = "QUEUED"
             response["id"] = jobid
-            response = self.checkResultsDB(squid, request, response)
+            if squid is not None:
+                response = self.checkResultsDB(squid, request, response)
             response["response_time"] = time.time() - t
             response["success"] = True
             obj.status_code = 200
@@ -272,6 +383,8 @@ class SubmitLocal(Singleton):
 
     def checkResultsDB(self, squid, request, response):
         try:
+            if self.session is None:
+                return response
             search = {
                 "tool": request["name"],
                 "revision": request["revision"],
@@ -322,32 +435,16 @@ class SubmitLocal(Singleton):
                     os.chdir(self.basepath)
                     r = Run(simToolLocation, inputs, "_" + str(jobid))
                     all_outputs = r.db.getSavedOutputs()
-                    for o in all_outputs:
+                    output_names = [o for o in outputs if o in all_outputs]
+                    if len(output_names) == 0:
+                        output_names = all_outputs
+                    for o in output_names:
                         try:
                             out = r.read(o)
-                            json.dumps(out)
-                            dictionary[o] = out
+                            dictionary[o] = self._serialize_output(out)
                         except:
-                            try:
-                                out = r.read(o)
-                                if isinstance(out, PIL.Image.Image):
-                                    buffered = io.BytesIO()
-                                    iformat = "PNG"
-                                    imime = "image/png"
-                                    if out.format is not None:
-                                        iformat = out.format
-                                        imime = out.get_format_mimetype()
-                                    out.save(buffered, format=iformat)
-                                    out = "data:" + imime + ";base64," + base64.b64encode(buffered.getvalue()).decode() 
-                                    dictionary[o] = out
-                                elif isinstance(out, (bytes, bytearray)):
-                                    print (o, out)
-                                    out = "data:application/octet-stream;base64," + base64.b64encode(out).decode()               
-                                    dictionary[o] = out
-
-                            except:
-                                traceback.print_exc()
-                                print (o + "can not be serialized")
+                            traceback.print_exc()
+                            print (o + "can not be serialized")
                                     
             with open(os.path.join(self.jobspath, "." + str(jobid)), "r") as file:
                 logs = file.read()
@@ -369,8 +466,10 @@ class SubmitLocal(Singleton):
                         id = open(os.path.join(jobpath, ".squidid"), "r").read().strip()
                         for k in inputs:
                             v = inputs[k].value
-                            if isinstance(v, str) and ".tmp." in v :
-                                os.unlink(f.name)
+                            if isinstance(v, str) and v.startswith("file://") and ".tmp." in v:
+                                tmp_path = v[7:]
+                                if os.path.exists(tmp_path):
+                                    os.unlink(tmp_path)
                         self.squidmap[id] = jobid
 
         except Exception as e:
@@ -398,11 +497,8 @@ class SubmitLocal(Singleton):
                 response["status"] = "RUNNING"
                 errorpath = os.path.join(jobpath, ".error")
                 if os.path.isfile(errorpath):
-                    er = json.load(
-                        open(
-                            errorpath,
-                        )
-                    )
+                    with open(errorpath, "r") as file:
+                        er = json.load(file)
                     response["message"] = er["message"]
                     response["status"] = "ERROR"
                     obj.status_code = er["code"]
@@ -410,36 +506,16 @@ class SubmitLocal(Singleton):
                     done = os.path.join(jobpath, ".done")
                     results = os.path.join(jobpath, ".results")
                     if os.path.isfile(done) and os.path.isfile(results):
-                        outputs = os.path.join(jobpath, ".outputs")
-                        if os.path.isfile(outputs):
-                            out = {}
-                            outl = json.load(open(outputs, "r"))
-                            res = json.load(open(results, "r"))
-                            for o in outl:
-                                if o in res:
-                                    out[o] = res[o]
-                                    
-                            if "_id_" not in out:
-                                if os.path.isfile(os.path.join(jobpath, ".squidid")):
-                                    out["_id_"] = open(
-                                        os.path.join(jobpath, ".squidid"), "r"
-                                    ).read()
-                        response["message"] = None
-                        response["outputs"] = out
-                        response["status"] = "CACHED"
+                        cached = self._final_status_response(jobid, jobpath)
+                        if cached is not None:
+                            response.update(cached)
                     elif os.path.exists(jobidpath):
-                        with open(jobidpath, "r") as log:
-                            response["message"] = self.lastSim2lLog(
-                                log, response["status"]
-                            )
-                            response["status"] = response["message"]
+                        response["message"] = self.lastSim2lLog(jobidpath, response["status"])
+                        response["status"] = response["message"]
             elif os.path.exists(jobidpath):
                 response["status"] = "STAGGING"
-                with open(jobidpath, "r") as log:
-                    response["message"] = self.lastSim2lLog(
-                        log, response["status"]
-                    )
-                    response["status"] = response["message"]
+                response["message"] = self.lastSim2lLog(jobidpath, response["status"])
+                response["status"] = response["message"]
             else:
                 response["message"] = ""
                 response["status"] = "NOT FOUND"
@@ -458,8 +534,51 @@ class SubmitLocal(Singleton):
             obj._content = bytes("Unknown", "utf8")
         return obj
 
+    def _final_status_response(self, jobid, jobpath):
+        outputs = os.path.join(jobpath, ".outputs")
+        results = os.path.join(jobpath, ".results")
+        squid = os.path.join(jobpath, ".squidid")
+        if not os.path.isfile(outputs):
+            return None
+
+        mtimes = (
+            os.path.getmtime(outputs),
+            os.path.getmtime(results),
+            os.path.getmtime(squid) if os.path.isfile(squid) else None,
+        )
+        cached = self._final_status_cache.get(jobid)
+        if cached is not None and cached[0] == mtimes:
+            return cached[1]
+
+        out = {}
+        with open(outputs, "r") as file:
+            outl = json.load(file)
+        with open(results, "r") as file:
+            res = json.load(file)
+        for o in outl:
+            if o in res:
+                out[o] = res[o]
+
+        if "_id_" not in out and os.path.isfile(squid):
+            with open(squid, "r") as file:
+                out["_id_"] = file.read()
+
+        response = {
+            "message": None,
+            "outputs": out,
+            "status": "CACHED",
+        }
+        self._final_status_cache[jobid] = (mtimes, response)
+        return response
+
     def lastSim2lLog(self, log, default):
-        logs = log.read()
+        if hasattr(log, "name"):
+            log = log.name
+        with open(log, "rb") as file:
+            file.seek(0, os.SEEK_END)
+            size = file.tell()
+            file.seek(max(size - 8192, 0), os.SEEK_SET)
+            logs = file.read().decode("utf8", errors="replace")
         logs = logs.split("\n")
         lastlog = default
         for l in logs:
@@ -634,12 +753,12 @@ class UIDLRequestHandler(http.server.BaseHTTPRequestHandler):
                     res = self.submit.handle(url, data)
                 else:
                     if method == "post":
-                        res = requests.post(
-                            url, headers=headers, data=data, allow_redirects=False
+                        res = self.submit.http_session.post(
+                            url, headers=headers, data=data, allow_redirects=False, timeout=REQUEST_TIMEOUT
                         )
                     else:
-                        res = requests.get(
-                            url, headers=headers, data=data, allow_redirects=False
+                        res = self.submit.http_session.get(
+                            url, headers=headers, data=data, allow_redirects=False, timeout=REQUEST_TIMEOUT
                         )
                 status = HTTPStatus(res.status_code)
                 text = res.text
@@ -925,6 +1044,7 @@ class UIDLRedirectHandler(UIDLHandler):
 
     @tornado.web.authenticated
     def get(self, *args, **kwargs):
+        submit = SubmitLocal()
         self.log.info('UIDLRedirectHandler gets (GET): %s -  %s', args[0], args[1])
         basefile = args[0]
         path = args[1]
@@ -936,8 +1056,8 @@ class UIDLRedirectHandler(UIDLHandler):
         elif path.startswith("api/"):
             try:
                 url = UIDLHandler._settings['hub_url'] + "/" + path
-                res = requests.get(
-                    url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False
+                res = submit.http_session.get(
+                    url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False, timeout=REQUEST_TIMEOUT
                 )
                 self.set_status(res.status_code)
                 self.finish(res.text)
@@ -947,6 +1067,7 @@ class UIDLRedirectHandler(UIDLHandler):
             return FilesRedirectHandler.redirect_to_files(self, path)
 
     def post(self, *args, **kwargs):
+        submit = SubmitLocal()
         self.log.info('UIDLRedirectHandler gets (GET): %s -  %s', args[0], args[1])
         basefile = args[0]
         path = args[1]
@@ -958,8 +1079,8 @@ class UIDLRedirectHandler(UIDLHandler):
         elif path.startswith("api/"):
             try:
                 url = UIDLHandler._settings['hub_url'] + "/" + path
-                res = requests.post(
-                    url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False
+                res = submit.http_session.post(
+                    url, headers=self.filter_headers(), data=self.filter_data(), allow_redirects=False, timeout=REQUEST_TIMEOUT
                 )
                 self.set_status(res.status_code)
                 self.finish(res.text)
