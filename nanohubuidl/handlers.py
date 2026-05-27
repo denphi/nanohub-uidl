@@ -261,7 +261,8 @@ class SubmitLocal(Singleton):
                     response[k][k2] = str(schema[k][k2])
         return response
 
-    def _serialize_output(self, output):
+    @staticmethod
+    def _serialize_output(output):
         try:
             json.dumps(output)
             return output
@@ -366,10 +367,24 @@ class SubmitLocal(Singleton):
                 f.write("Setting up Sim2L")
                 
             thread = Process(
-                target=SubmitLocal.runJob,
-                args=(self, jobid, simToolLocation, inputs, request["outputs"]),
+                target=SubmitLocal.runJobState,
+                args=(
+                    self.basepath,
+                    self.jobspath,
+                    self.squidmap,
+                    jobid,
+                    simToolLocation,
+                    inputs,
+                    request["outputs"],
+                ),
             )
-            thread.start()
+            try:
+                thread.start()
+            except Exception as e:
+                if not os.path.exists(jobpath):
+                    os.makedirs(jobpath)
+                with open(os.path.join(jobpath, ".error"), "w") as outfile:
+                    json.dump({"message": str(e), "code": 500}, outfile)
             response["message"] = ""
             response["status"] = "QUEUED"
             response["id"] = jobid
@@ -425,14 +440,26 @@ class SubmitLocal(Singleton):
         return response
 
     def runJob(self, jobid, simToolLocation, inputs, outputs):
+        return SubmitLocal.runJobState(
+            self.basepath,
+            self.jobspath,
+            self.squidmap,
+            jobid,
+            simToolLocation,
+            inputs,
+            outputs,
+        )
+
+    @staticmethod
+    def runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs):
+        jobpath = os.path.join(jobspath, "_" + str(jobid))
         try:
-            jobpath = os.path.join(self.jobspath, "_" + str(jobid))
             with open(
-                os.path.join(self.jobspath, "." + str(jobid)), "a", buffering=1
+                os.path.join(jobspath, "." + str(jobid)), "a", buffering=1
             ) as sys.stdout:
                 with sys.stdout as sys.stderr:
                     dictionary = {}
-                    os.chdir(self.basepath)
+                    os.chdir(basepath)
                     r = Run(simToolLocation, inputs, "_" + str(jobid))
                     all_outputs = r.db.getSavedOutputs()
                     output_names = [o for o in outputs if o in all_outputs]
@@ -441,12 +468,12 @@ class SubmitLocal(Singleton):
                     for o in output_names:
                         try:
                             out = r.read(o)
-                            dictionary[o] = self._serialize_output(out)
+                            dictionary[o] = SubmitLocal._serialize_output(out)
                         except:
                             traceback.print_exc()
                             print (o + "can not be serialized")
                                     
-            with open(os.path.join(self.jobspath, "." + str(jobid)), "r") as file:
+            with open(os.path.join(jobspath, "." + str(jobid)), "r") as file:
                 logs = file.read()
                 if "SimTool execution failed" in logs:
                     with open(os.path.join(jobpath, ".error"), "w") as outfile:
@@ -470,7 +497,7 @@ class SubmitLocal(Singleton):
                                 tmp_path = v[7:]
                                 if os.path.exists(tmp_path):
                                     os.unlink(tmp_path)
-                        self.squidmap[id] = jobid
+                        squidmap[id] = jobid
 
         except Exception as e:
             traceback.print_exc()
@@ -538,11 +565,9 @@ class SubmitLocal(Singleton):
         outputs = os.path.join(jobpath, ".outputs")
         results = os.path.join(jobpath, ".results")
         squid = os.path.join(jobpath, ".squidid")
-        if not os.path.isfile(outputs):
-            return None
 
         mtimes = (
-            os.path.getmtime(outputs),
+            os.path.getmtime(outputs) if os.path.isfile(outputs) else None,
             os.path.getmtime(results),
             os.path.getmtime(squid) if os.path.isfile(squid) else None,
         )
@@ -551,10 +576,13 @@ class SubmitLocal(Singleton):
             return cached[1]
 
         out = {}
-        with open(outputs, "r") as file:
-            outl = json.load(file)
         with open(results, "r") as file:
             res = json.load(file)
+        if os.path.isfile(outputs):
+            with open(outputs, "r") as file:
+                outl = json.load(file)
+        else:
+            outl = list(res.keys())
         for o in outl:
             if o in res:
                 out[o] = res[o]
