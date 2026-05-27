@@ -644,12 +644,19 @@ class SubmitLocal(Singleton):
             size = file.tell()
             file.seek(max(size - 8192, 0), os.SEEK_SET)
             logs = file.read().decode("utf8", errors="replace")
-        logs = logs.split("\n")
         lastlog = default
-        for l in logs:
-            if len(l.strip()) > 5:
-                lastlog = l
+        for line in re.split(r"[\r\n]+", logs):
+            line = self.cleanSim2lLogLine(line)
+            if len(line.strip()) > 5:
+                lastlog = line
         return lastlog
+
+    def cleanSim2lLogLine(self, line):
+        line = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", line)
+        line = line.replace("\x00", "").strip()
+        if line.startswith("Executing:"):
+            line = re.sub(r"\s+", " ", line)
+        return line
 
     def authTask(self, request):
         obj = Response()
