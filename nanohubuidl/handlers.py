@@ -1,6 +1,4 @@
-"""API handlers for the Jupyter Server example."""
-from jupyter_server.extension.handler import ExtensionHandlerJinjaMixin, ExtensionHandlerMixin
-from jupyter_server.utils import url_escape
+"""API handlers for the notebook server extension."""
 from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
 import tornado
 import re

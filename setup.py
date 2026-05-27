@@ -87,7 +87,6 @@ setup_args = {
     'install_requires' : [
         'nanohub-remote>=0.1.0',
         'simtool',
-        'jupyter_server',
         'notebook<7'
     ],
     'extras_require' : {

@@ -43,20 +43,19 @@ import json
 
 import requests
 import argparse
-import jupyter_server
 
 
 """The extension entry point."""
 
 def _jupyter_server_extension_paths():
     return [
-        {"module": "nanohubuidl", "app": UIDLmode},
+        {"module": "nanohubuidl"},
     ]
 
 _jupyter_server_extension_points = _jupyter_server_extension_paths
 
 
-def load_jupyter_server_extension(serverapp: jupyter_server.serverapp.ServerApp):
+def load_jupyter_server_extension(serverapp):
     handlers = UIDLmode.handlers(serverapp.web_app.settings['base_url'])
     serverapp.web_app.add_handlers('.*$', handlers)
 

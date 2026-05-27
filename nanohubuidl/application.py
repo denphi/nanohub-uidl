@@ -1,6 +1,4 @@
 import os
-from traitlets import Unicode
-from jupyter_server.extension.application import ExtensionApp, ExtensionAppJinjaMixin
 from .handlers import *
 from notebook.base.handlers import IPythonHandler, FilesRedirectHandler, path_regex
 from notebook.utils import url_path_join
@@ -11,8 +9,8 @@ DEFAULT_TEMPLATE_FILES_PATH = os.path.join(os.path.dirname(__file__), "templates
 
     
 
-class UIDLmode(ExtensionAppJinjaMixin, ExtensionApp):
-    """A simple application."""
+class UIDLmode(object):
+    """Notebook handler registration helper."""
 
     # The name of the extension.
     name = "nanohubuidl"
@@ -29,8 +27,7 @@ class UIDLmode(ExtensionAppJinjaMixin, ExtensionApp):
     # Local path to templates directory.
     template_paths = [DEFAULT_TEMPLATE_FILES_PATH]
 
-    configD = Unicode("", config=True, help="Config D example.")  # noqa
-
+    @staticmethod
     def handlers(baseurl):
         return [
                 (url_path_join(baseurl, r"/uidl/([A-Z]*.HTML)/local/(.*)"), UIDLLocalHandler),
@@ -46,4 +43,4 @@ class UIDLmode(ExtensionAppJinjaMixin, ExtensionApp):
         """Initialize settings."""
         self.log.info(f"Config {self.config}")
 
-main = launch_new_instance = UIDLmode
+main = launch_new_instance = None
