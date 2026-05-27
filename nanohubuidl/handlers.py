@@ -364,7 +364,7 @@ class SubmitLocal(Singleton):
                 else:
                     created = True
             with open(os.path.join(self.jobspath, "." + str(jobid)), "w") as f:
-                f.write("Setting up Sim2L")
+                f.write("Setting up Sim2L\n")
                 
             thread = Process(
                 target=SubmitLocal.runJobState,
@@ -458,21 +458,45 @@ class SubmitLocal(Singleton):
                 os.path.join(jobspath, "." + str(jobid)), "a", buffering=1
             ) as sys.stdout:
                 with sys.stdout as sys.stderr:
-                    dictionary = {}
-                    os.chdir(basepath)
-                    r = Run(simToolLocation, inputs, "_" + str(jobid))
-                    all_outputs = r.db.getSavedOutputs()
-                    output_names = [o for o in outputs if o in all_outputs]
-                    if len(output_names) == 0:
-                        output_names = all_outputs
-                    for o in output_names:
-                        try:
-                            out = r.read(o)
-                            dictionary[o] = SubmitLocal._serialize_output(out)
-                        except:
-                            traceback.print_exc()
-                            print (o + "can not be serialized")
-                                    
+                    with open(os.devnull, "r") as devnull:
+                        os.dup2(devnull.fileno(), 0)
+                        SubmitLocal._runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs)
+        except Exception as e:
+            traceback.print_exc()
+            error = {"message": str(e), "code": 500}
+            with open(os.path.join(jobpath, ".error"), "w") as outfile:
+                json.dump(error, outfile)
+        except:
+            traceback.print_exc()
+            error = {"message": "Server Error", "code": 500}
+            with open(os.path.join(jobpath, ".error"), "w") as outfile:
+                json.dump(error, outfile)
+        return
+
+    @staticmethod
+    def _runJobState(basepath, jobspath, squidmap, jobid, simToolLocation, inputs, outputs):
+        jobpath = os.path.join(jobspath, "_" + str(jobid))
+        try:
+            dictionary = {}
+            os.chdir(basepath)
+            print("UIDL worker pid = " + str(os.getpid()))
+            print("UIDL worker cwd = " + str(os.getcwd()))
+            print("UIDL jobpath = " + str(jobpath))
+            print("UIDL outputs requested = " + json.dumps(outputs))
+            print("UIDL input keys = " + json.dumps(list(inputs.keys())))
+            r = Run(simToolLocation, inputs, "_" + str(jobid))
+            all_outputs = r.db.getSavedOutputs()
+            output_names = [o for o in outputs if o in all_outputs]
+            if len(output_names) == 0:
+                output_names = all_outputs
+            for o in output_names:
+                try:
+                    out = r.read(o)
+                    dictionary[o] = SubmitLocal._serialize_output(out)
+                except:
+                    traceback.print_exc()
+                    print (o + "can not be serialized")
+
             with open(os.path.join(jobspath, "." + str(jobid)), "r") as file:
                 logs = file.read()
                 if "SimTool execution failed" in logs:
