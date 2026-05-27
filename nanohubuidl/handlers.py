@@ -87,6 +87,7 @@ class SubmitLocal(Singleton):
         self._schema_cache = {}
         self._input_schema_cache = {}
         self._final_status_cache = {}
+        self._pending_squid_jobs = {}
         for subdir, dirs, files in os.walk(jobspath):
             for file in files:
                 if file == ".squidid":
@@ -314,6 +315,14 @@ class SubmitLocal(Singleton):
         else:
             return None
 
+    def _squid_cache_key(self, squidid):
+        return str(squidid).replace("/r", "/")
+
+    def _clear_pending_job(self, jobid):
+        for squidid, pending_jobid in list(self._pending_squid_jobs.items()):
+            if str(pending_jobid) == str(jobid):
+                self._pending_squid_jobs.pop(squidid, None)
+
     def runTask(self, request):
         obj = Response()
         response = {}
@@ -355,14 +364,19 @@ class SubmitLocal(Singleton):
                 simToolName, simToolRevision, hashableInputs, self.squiddb
             )
             squid = ds.getSimToolSquidId()
-            jobid = self.searchJobId(squid.replace("/r", "/"))
+            squid_key = self._squid_cache_key(squid)
+            jobid = self.searchJobId(squid_key)
+            if jobid is None:
+                jobid = self._pending_squid_jobs.get(squid_key)
         except:
             jobid = None
+            squid_key = None
             
         if jobid is not None:
             jobpath = os.path.join(self.jobspath, "_" + str(jobid))
-            with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
-                json.dump(request["outputs"], outfile)
+            if os.path.isdir(jobpath):
+                with open(os.path.join(jobpath, ".outputs"), "w") as outfile:
+                    json.dump(request["outputs"], outfile)
             return self.statusTask(jobid)
         else:
             jobid = random.randint(1, 100000)
@@ -376,6 +390,8 @@ class SubmitLocal(Singleton):
                     created = True
             with open(os.path.join(self.jobspath, "." + str(jobid)), "w") as f:
                 f.write("Setting up Sim2L\n")
+            if squid_key is not None:
+                self._pending_squid_jobs[squid_key] = jobid
                 
             thread = Process(
                 target=SubmitLocal.runJobState,
@@ -393,6 +409,7 @@ class SubmitLocal(Singleton):
             try:
                 thread.start()
             except Exception as e:
+                self._clear_pending_job(jobid)
                 if not os.path.exists(jobpath):
                     os.makedirs(jobpath)
                 with open(os.path.join(jobpath, ".error"), "w") as outfile:
@@ -566,6 +583,7 @@ class SubmitLocal(Singleton):
                     response["message"] = er["message"]
                     response["status"] = "ERROR"
                     obj.status_code = er["code"]
+                    self._clear_pending_job(jobid)
                 else:
                     done = os.path.join(jobpath, ".done")
                     results = os.path.join(jobpath, ".results")
@@ -573,6 +591,7 @@ class SubmitLocal(Singleton):
                         cached = self._final_status_response(jobid, jobpath)
                         if cached is not None:
                             response.update(cached)
+                            self._clear_pending_job(jobid)
                     elif os.path.exists(jobidpath):
                         response["message"] = self.lastSim2lLog(jobidpath, response["status"])
                         response["status"] = response["message"]
@@ -584,6 +603,7 @@ class SubmitLocal(Singleton):
                 response["message"] = ""
                 response["status"] = "NOT FOUND"
                 obj.status_code = 404
+                self._clear_pending_job(jobid)
 
             response["response_time"] = time.time() - t
             response["success"] = True
