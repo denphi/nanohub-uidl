@@ -629,12 +629,18 @@ class SubmitLocal(Singleton):
                 out["_id_"] = file.read()
 
         response = {
-            "message": None,
+            "message": self.outputsLoadedMessage(out),
             "outputs": out,
             "status": "CACHED",
         }
         self._final_status_cache[jobid] = (mtimes, response)
         return response
+
+    def outputsLoadedMessage(self, outputs):
+        names = [k for k in outputs.keys() if k != "_id_"]
+        if len(names) == 0:
+            return "Loaded simulation outputs"
+        return "Loaded simulation outputs: " + ", ".join(names)
 
     def lastSim2lLog(self, log, default):
         if hasattr(log, "name"):
